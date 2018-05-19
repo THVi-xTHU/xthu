@@ -113,9 +113,12 @@ class LightPool(object):
         """
         self.remove_tracker()
         tboxes, valid_indexes = self.predict(image)
- 
+        
         overlaps = bbox_overlaps(tboxes, dboxes)
-        matched_indices = linear_assignment(-overlaps)
+        if np.prod(overlaps.shape) != 0:
+            matched_indices = linear_assignment(-overlaps)
+        else:
+            matched_indices = np.array([])
         
         merged_boxes = []
         for matched in matched_indices:
@@ -125,13 +128,13 @@ class LightPool(object):
                                 
         # new detected traffic lights
         for i in range(dboxes.shape[0]):
-            if i not in matched_indices[:, 1]:
+            if matched_indices.shape[0] == 0 or i not in matched_indices[:, 1]:
                 merged_boxes.append((len(self.trackers), dboxes[i, :]))
                 self.add_tracker(image, dboxes[i, :])
         
         # tracked but not detected traffic lights
         for i in range(tboxes.shape[0]):
-            if i not in matched_indices[:, 0]:
+            if matched_indices.shape[0] == 0 or i not in matched_indices[:, 0]:
                 if valid_indexes[i] >  self.conf_threshold:
                     merged_boxes.append((i, tboxes[i, :]))
         

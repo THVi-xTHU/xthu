@@ -21,6 +21,9 @@ def intersection(a, b):
 def bbox_overlaps(bbox1, bbox2):
     rows = []
     for bbox in bbox1:
-        row = overlap_ratio(bbox2, bbox)
-        rows.append(row)
+        if bbox2.shape[0] == 0: 
+            rows.append(np.empty((0, )))
+        else:
+            row = overlap_ratio(bbox2, bbox)
+            rows.append(row)
     return np.array(rows)

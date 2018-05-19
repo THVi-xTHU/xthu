@@ -17,7 +17,7 @@ class BlindNavigator(object):
     def __init__(self):
         self.detector = YOLO('keras_yolo3/model_data/yolo.h5', anchors_path='keras_yolo3/model_data/yolo_anchors.txt', classes_path='keras_yolo3/model_data/yolo.names')
         self.depth_estimator = Depth(model_path='fcrn_depth_prediction/model/NYU_FCRN.ckpt')
-#         self.zebra_detector = Zebra()
+        self.zebra_detector = Zebra()
         
         self.traffic_light_pool = LightPool()
         self.STATE = ['FORWARD', 'WAIT'] 
@@ -89,7 +89,7 @@ class BlindNavigator(object):
     def estimate_pedestrain_light(self, image, traffic_lights):
         # traffic lights are loaded from traffic_lights_pool
         # zebra_end_point: tuple (x, y), line: has k and b attribute
-        is_stable, zebra_end_point, line_left, line_right, contours = self.zebra_detector.predict()
+        is_stable, zebra_end_point, line_left, line_right, zebra_contours = self.zebra_detector.predict()
         
         if not is_stable:
             return [2] * len(traffic_lights)
