@@ -15,34 +15,25 @@ from keras import backend as K
 from keras.models import load_model
 from PIL import Image, ImageFont, ImageDraw
 
-from yolo3.model import yolo_eval
-from yolo3.utils import letterbox_image
+from .yolo3.model import yolo_eval
+from .yolo3.utils import letterbox_image
+
+
+
 import sys
 m = 'yolo'
 
 import os
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
-def classify(cropped_img, bins=1000, tails=1, order='012', thresh=0.005):
-    order = [int(o) for o in order]
-    *rgb, = (cropped_img[:, :, i] for i in range(3))
-    rgb = [rgb[o] for o in order]
-    
-    rgb_hist = [np.histogram(c, bins=bins)[0] for c in rgb]
-    right_hist = [np.sum(h[-tails:]) for h in rgb_hist]
-    res = np.argmax(right_hist)
-    
-    if right_hist[res] < np.sum([rgb_hist[res]]) * thresh:
-        return 'Black'
-    
-    cmp = ('Red', 'Green', 'Green')
-    hist = [right_hist[0], right_hist[1], right_hist[2]]
-    return cmp[np.argmax(hist)]
+
+
+
 
 class YOLO(object):
-    def __init__(self):
-        self.model_path = 'model_data/%s.h5'%m
-        self.anchors_path = 'model_data/yolo_anchors.txt'
-        self.classes_path = 'model_data/%s.names'%m
+    def __init__(self, model_path='model_data/%s.h5'%m, anchors_path='model_data/yolo_anchors.txt', classes_path='model_data/%s.names'%m):
+        self.model_path = model_path
+        self.anchors_path = anchors_path
+        self.classes_path = classes_path
         self.score = 0.3
         self.iou = 0.5
         self.class_names = self._get_class()
@@ -92,6 +83,56 @@ class YOLO(object):
                 score_threshold=self.score, iou_threshold=self.iou)
         return boxes, scores, classes
 
+    def predict(self, image):
+        image = Image.fromarray(image)
+
+        if self.is_fixed_size:
+            assert self.model_image_size[0]%32 == 0, 'Multiples of 32 required'
+            assert self.model_image_size[1]%32 == 0, 'Multiples of 32 required'
+            boxed_image = letterbox_image(image, tuple(reversed(self.model_image_size)))
+        else:
+            new_image_size = (image.width - (image.width % 32),
+                              image.height - (image.height % 32))
+            boxed_image = letterbox_image(image, new_image_size)
+        image_data = np.array(boxed_image, dtype='float32')
+        
+        image_data /= 255.
+        image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
+
+        out_boxes, out_scores, out_classes = self.sess.run(
+            [self.boxes, self.scores, self.classes],
+            feed_dict={
+                self.yolo_model.input: image_data,
+                self.input_image_shape: [image.size[1], image.size[0]],
+                K.learning_phase(): 0
+            })
+
+
+        detected_list = []
+        for i, c in reversed(list(enumerate(out_classes))):
+            predicted_class = self.class_names[c]
+            box = out_boxes[i]
+            score = out_scores[i]
+
+            top, left, bottom, right = box
+            top = max(0, np.floor(top + 0.5).astype('int32'))
+            left = max(0, np.floor(left + 0.5).astype('int32'))
+            bottom = min(image.size[1], np.floor(bottom + 0.5).astype('int32'))
+            right = min(image.size[0], np.floor(right + 0.5).astype('int32'))
+            print(predicted_class, (left, top), (right, bottom))
+            
+#             if predicted_class == 'traffic light':
+#                 try:
+#                     cropped = np.array(image.crop((left, top, right, bottom)).getdata()).reshape(-1, right - left, 3)
+#                 except:
+#                     cropped = np.array(image.crop((left, top, right, bottom)).getdata()).reshape(-1, right - left, 4)
+#                 color = classify(cropped, order='210')
+#                 predicted_class += ' ' + color
+            
+            detected_list.append((predicted_class, np.array([left, top, right, bottom]).reshape(1, 4)))
+        return detected_list
+              
+        
     def detect_image(self, image):
         start = time.time()
 
@@ -119,9 +160,9 @@ class YOLO(object):
 
         print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
 
-        font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
-                    size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
-        thickness = (image.size[0] + image.size[1]) // 300
+#         font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
+#                     size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
+        thickness = max((image.size[0] + image.size[1]) // 600, 2)
 
         for i, c in reversed(list(enumerate(out_classes))):
             predicted_class = self.class_names[c]
@@ -146,7 +187,7 @@ class YOLO(object):
             
             label = '{} {:.2f}'.format(predicted_class, score)
             draw = ImageDraw.Draw(image)
-            label_size = draw.textsize(label, font)
+            label_size = draw.textsize(label)
                 
 
             if top - label_size[1] >= 0:
@@ -162,7 +203,7 @@ class YOLO(object):
             draw.rectangle(
                 [tuple(text_origin), tuple(text_origin + label_size)],
                 fill=self.colors[c])
-            draw.text(text_origin, label, fill=(0, 0, 0), font=font)
+            draw.text(text_origin, label, fill=(0, 0, 0))
             del draw
 
         end = time.time()
@@ -187,9 +228,8 @@ def detect_video(yolo, video_path):
         try:
             return_value, frame = vid.read()
             image = Image.fromarray(frame)
-        except:
-            import traceback
-            traceback.print_exc()
+        except Exception as e:
+            print(e)
             break
         image = yolo.detect_image(image)
         result = np.asarray(image)
@@ -206,7 +246,7 @@ def detect_video(yolo, video_path):
                     fontScale=0.50, color=(255, 0, 0), thickness=2)
         #cv2.namedWindow("result", cv2.WINDOW_NORMAL)
         i += 1
-        cv2.imwrite("result/result_%s.jpg"%i, result)
+        cv2.imwrite("result/result_%.4d.jpg"%i, result)
         #if cv2.waitKey(1) & 0xFF == ord('q'):
         #    break
     yolo.close_session()
