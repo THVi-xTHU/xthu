@@ -35,7 +35,7 @@ class BlindNavigator(object):
     def detect_traffic_light(self, image):
         # detected = [('cls', [array (1, 4) for box]), ...]
         detected = self.detector.predict(image)
-        detected_traffic_lights = [d for d in detected if 'traffic light' in d[0]]
+        detected_traffic_lights = np.array([d[1] for d in detected if 'traffic light' in d[0]])
         detected_obstacles = [d for d in detected if 'traffic light' not in d[0]]
         
         traffic_lights = self.traffic_light_pool.get_boxes(image, detected_traffic_lights)
@@ -46,7 +46,7 @@ class BlindNavigator(object):
         labels = []
         for box in boxes:
             cropped_image = image[box[1]:box[3], box[0]:box[2], :]
-            labels.append(self.color_classify_by_patch(cropped_img, order))
+            labels.append(self.color_classify_by_patch(cropped_image, order))
         return labels
     
     def color_classify_by_patch(self, cropped_img, order='012'):
@@ -127,8 +127,8 @@ class BlindNavigator(object):
         traffic_lights, detected_obstacles = self.detect_traffic_light(image)
         light_states = self.color_classify_by_boxes(image, [light[1] for light in traffic_lights])
         light_types = self.estimate_pedestrain_light(image, traffic_lights)
-        self.traffic_light_pool.update_types(light_types)
-        self.traffic_light_pool.update_states(light_states)
+        self.traffic_light_pool.set_types(light_types)
+        self.traffic_light_pool.set_states(light_states)
         plight = self.get_pedestrain_light()
     
 #         if plight:

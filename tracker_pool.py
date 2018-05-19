@@ -28,7 +28,7 @@ class LightTracker(object):
             self.bbox = pbox
         return point_size2two_point(pbox), peak_value
 
-    def rectify(self, image, bbox):
+    def rectify(self, bbox):
         self.bbox = two_point2point_size(bbox)
         self.hit += 1
     
@@ -102,9 +102,9 @@ class LightPool(object):
         valid_indexes = []
         for i, tracker in enumerate(self.trackers):
             bbox, pval = tracker.predict(image)
-            est_boxes.append(est_boxes)
+            est_boxes.append(bbox)
             valid_indexes.append(pval)
-        est_boxes = np.array(est_boxes)
+        est_boxes = np.array(est_boxes).reshape(-1, 4)
         return est_boxes, valid_indexes
 
     def get_boxes(self, image, dboxes):
@@ -113,8 +113,12 @@ class LightPool(object):
         """
         self.remove_tracker()
         tboxes, valid_indexes = self.predict(image)
-        overlaps = bbox_overlaps(tboxes, dboxes)
-        matched_indices = linear_assignment(-overlaps) 
+        if len(dboxes) == 0 or len(tboxes) == 0:
+            return tboxes
+        else:
+            overlaps = bbox_overlaps(tboxes, dboxes)
+            matched_indices = linear_assignment(-overlaps)
+        
         merged_boxes = []
         for matched in matched_indices:
             if overlaps[matched[0], matched[1]] > self.iou_threshold:
@@ -124,8 +128,8 @@ class LightPool(object):
         # new detected traffic lights
         for i in range(dboxes.shape[0]):
             if i not in matched_indices[:, 1]:
-                merged_boxes.append((len(self.trackers), tboxes[i, :]))
-                self.trackers.add_tracker(image, dboxes[i, :])
+                merged_boxes.append((len(self.trackers), dboxes[i, :]))
+                self.add_tracker(image, dboxes[i, :])
         
         # tracked but not detected traffic lights
         for i in range(tboxes.shape[0]):
@@ -139,8 +143,8 @@ class LightPool(object):
     def set_types(self, types):
         for (id_, boxes), typ in zip(self.output_boxes, types):
             self.trackers[id_].add_type(typ)
-            if tracker.pc[typ] > self.forward_max_times: 
-                self.forward_max_times = tracker.pc[typ]
+            if self.trackers[id_].pc[typ] > self.forward_max_times:
+                self.forward_max_times = self.trackers[id_].pc[typ]
             
     def set_states(self, states):
         for (id_, boxes), state in zip(self.output_boxes, states):
@@ -155,8 +159,8 @@ class LightPool(object):
         if len(self.trackers) == 0:
             self.pedestrain_light = None
             return
-        if forward_max_times == cur_max_times:
-            if cur_max_times < 5:
+        if self.forward_max_times == self.cur_max_times:
+            if self.cur_max_times < 5:
                 self.pedestrain_light =  None
             else:
                 self.pedestrain_light = self.trackers[0]
