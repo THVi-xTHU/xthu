@@ -8,7 +8,7 @@ from easydict import EasyDict as edict
 from PIL import Image
 import cv2
 import time
-import models
+from . import models
 
 def load_model():
     height = 228
@@ -67,7 +67,7 @@ def predict_image(model_data_path, image_path, net, input_node):
         pred = sess.run(net.get_output(), feed_dict={input_node: img})
         
         # Plot result
-        print img.shape, pred.shape
+        print(img.shape, pred.shape)
         plot_image(img_ori, pred[0,:,:,0])
         
         return pred

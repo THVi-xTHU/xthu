@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+from PIL import Image
 from . import models
 
 class Depth(object):
@@ -29,7 +30,7 @@ class Depth(object):
     def predict(self, img):
         img = Image.fromarray(img, 'RGB')
 
-        img = img.resize([self.width, self.height], Image.ANTIALIAS)
+        img = img.resize([img.input_width, self.input_height], Image.ANTIALIAS)
 
         img = np.array(img).astype('float32')
         img = np.expand_dims(np.asarray(img), axis = 0)

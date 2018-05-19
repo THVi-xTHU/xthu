@@ -113,11 +113,9 @@ class LightPool(object):
         """
         self.remove_tracker()
         tboxes, valid_indexes = self.predict(image)
-        if len(dboxes) == 0 or len(tboxes) == 0:
-            return tboxes
-        else:
-            overlaps = bbox_overlaps(tboxes, dboxes)
-            matched_indices = linear_assignment(-overlaps)
+ 
+        overlaps = bbox_overlaps(tboxes, dboxes)
+        matched_indices = linear_assignment(-overlaps)
         
         merged_boxes = []
         for matched in matched_indices:

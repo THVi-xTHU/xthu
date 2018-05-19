@@ -168,7 +168,7 @@ class KCFTracker:
         '''
         if(self._hogfeatures):
             c = np.zeros((self.size_patch[0], self.size_patch[1]), np.float32)
-            for i in xrange(self.size_patch[2]):
+            for i in range(self.size_patch[2]):
                 x1aux = x1[i, :].reshape((self.size_patch[0], self.size_patch[1]))
                 x2aux = x2[i, :].reshape((self.size_patch[0], self.size_patch[1]))
                 caux = cv2.mulSpectrums(fftd(x1aux), fftd(x2aux), 0, conjB = True)
@@ -238,7 +238,7 @@ class KCFTracker:
             mapp = fhog.getFeatureMaps(z, self.cell_size, mapp)
             mapp = fhog.normalizeAndTruncate(mapp, 0.2)
             mapp = fhog.PCAFeatureMaps(mapp)
-            self.size_patch = map(int, [mapp['sizeY'], mapp['sizeX'], mapp['numFeatures']])
+            self.size_patch = list(map(int, [mapp['sizeY'], mapp['sizeX'], mapp['numFeatures']]))
             FeaturesMap = mapp['map'].reshape((self.size_patch[0]*self.size_patch[1], self.size_patch[2])).T   # (size_patch[2], size_patch[0]*size_patch[1])
         else:
             if(z.ndim==3 and z.shape[2]==3):

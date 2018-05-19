@@ -7,7 +7,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 
 from PIL import Image
 
-import models
+from . import models
 
 def predict(model_data_path, image_path):
 

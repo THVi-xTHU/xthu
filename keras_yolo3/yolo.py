@@ -119,6 +119,7 @@ class YOLO(object):
             left = max(0, np.floor(left + 0.5).astype('int32'))
             bottom = min(image.size[1], np.floor(bottom + 0.5).astype('int32'))
             right = min(image.size[0], np.floor(right + 0.5).astype('int32'))
+            print('image size: ', image.size)
             print(predicted_class, (left, top), (right, bottom))
             
 #             if predicted_class == 'traffic light':
@@ -129,7 +130,7 @@ class YOLO(object):
 #                 color = classify(cropped, order='210')
 #                 predicted_class += ' ' + color
             
-            detected_list.append((predicted_class, np.array([left, top, right, bottom]).reshape(1, 4)))
+            detected_list.append((predicted_class, np.array([left, top, right, bottom])))
         return detected_list
               
         

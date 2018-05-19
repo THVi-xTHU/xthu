@@ -1,6 +1,13 @@
 *.weights
 *.png
+*.mp4
+*.mov
+*.avi
 data
 *.pyc
-FCRN-DepthPrediction/matlab/
-FCRN-DepthPrediction/tensorflow/model/
+*.h5
+*.m4v
+*/models/*
+*/model/*
+.ipynb_checkpoints/
+*/__pycache__/*
