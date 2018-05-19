@@ -1,0 +1,6 @@
+*.weights
+*.png
+data
+*.pyc
+FCRN-DepthPrediction/matlab/
+FCRN-DepthPrediction/tensorflow/model/
