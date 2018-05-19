@@ -34,7 +34,6 @@ class Depth(object):
 
         img = np.array(img).astype('float32')
         img = np.expand_dims(np.asarray(img), axis = 0)
-        print(img.shape)
         pred = self.sess.run(self.net.get_output(), feed_dict={self.input_node: img})
         return pred[:, :, 0]
 

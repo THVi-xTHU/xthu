@@ -14,9 +14,14 @@ import numpy as np
 from keras import backend as K
 from keras.models import load_model
 from PIL import Image, ImageFont, ImageDraw
+from color_classify import estimate_label
 
-from .yolo3.model import yolo_eval
-from .yolo3.utils import letterbox_image
+try:
+    from .yolo3.model import yolo_eval
+    from .yolo3.utils import letterbox_image
+except:
+    from yolo3.model import yolo_eval
+    from yolo3.utils import letterbox_image
 
 
 
@@ -24,9 +29,12 @@ import sys
 m = 'yolo'
 
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1 '
 
-
+def classify(cropped_img, order='012'):
+    order = [int(o) for o in order]
+    img = cropped_img[:, :, order]
+    return estimate_label(img.astype(np.uint8))
 
 
 class YOLO(object):
@@ -119,8 +127,8 @@ class YOLO(object):
             left = max(0, np.floor(left + 0.5).astype('int32'))
             bottom = min(image.size[1], np.floor(bottom + 0.5).astype('int32'))
             right = min(image.size[0], np.floor(right + 0.5).astype('int32'))
-            print('image size: ', image.size)
-            print(predicted_class, (left, top), (right, bottom))
+#             print('image size: ', image.size)
+#             print(predicted_class, (left, top), (right, bottom))
             
 #             if predicted_class == 'traffic light':
 #                 try:
@@ -147,7 +155,6 @@ class YOLO(object):
             boxed_image = letterbox_image(image, new_image_size)
         image_data = np.array(boxed_image, dtype='float32')
 
-        print(image_data.shape)
         image_data /= 255.
         image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
 
@@ -161,8 +168,8 @@ class YOLO(object):
 
         print('Found {} boxes for {}'.format(len(out_boxes), 'img'))
 
-#         font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
-#                     size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
+        font = ImageFont.truetype(font='font/FiraMono-Medium.otf',
+                     size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
         thickness = max((image.size[0] + image.size[1]) // 600, 2)
 
         for i, c in reversed(list(enumerate(out_classes))):
@@ -188,7 +195,7 @@ class YOLO(object):
             
             label = '{} {:.2f}'.format(predicted_class, score)
             draw = ImageDraw.Draw(image)
-            label_size = draw.textsize(label)
+            label_size = draw.textsize(label, font)
                 
 
             if top - label_size[1] >= 0:
@@ -204,7 +211,7 @@ class YOLO(object):
             draw.rectangle(
                 [tuple(text_origin), tuple(text_origin + label_size)],
                 fill=self.colors[c])
-            draw.text(text_origin, label, fill=(0, 0, 0))
+            draw.text(text_origin, label, fill=(0, 0, 0), font=font)
             del draw
 
         end = time.time()

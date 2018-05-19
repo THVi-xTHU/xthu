@@ -61,7 +61,7 @@ def red_green_yellow(rgb_image):
   '''
   hsv = cv2.cvtColor(rgb_image, cv2.COLOR_RGB2HSV)
   sum_saturation = np.sum(hsv[:,:,1]) # Sum the brightness values
-  area = 32*32
+  area = rgb_image.shape[0] * rgb_image.shape[1]
   avg_saturation = sum_saturation / area # Find the average
 
   sat_low = int(avg_saturation * 1.3)
@@ -89,8 +89,7 @@ def red_green_yellow(rgb_image):
   sum_yellow = findNonZero(yellow_result)
   sum_red = findNonZero(red_result)
 
-  if sum_red >= sum_yellow and sum_red >= sum_green:
-    return 'R'
-  if sum_yellow >= sum_green:
-    return 'Y'
-  return 'G'
+  sums = [sum_red, sum_yellow, sum_green]
+  if max(sums) <  0.01 * area:
+    return 'B'
+  return ('R', 'Y', 'G')[np.argmax(sums)]

@@ -79,7 +79,6 @@ def subwindow(img, window, borderType=cv2.BORDER_CONSTANT):
     limit(cutWindow, [0,0,img.shape[1],img.shape[0]])   # modify cutWindow
     assert(cutWindow[2]>0 and cutWindow[3]>0)
     border = getBorder(window, cutWindow)
-    print(cutWindow)
     res = img[cutWindow[1]:cutWindow[1]+cutWindow[3], cutWindow[0]:cutWindow[0]+cutWindow[2]]
 
     if(border != [0,0,0,0]):
@@ -229,7 +228,6 @@ class KCFTracker:
         if(z.shape[1]!=self._tmpl_sz[0] or z.shape[0]!=self._tmpl_sz[1]):
             self._tmpl_sz[0]=int(self._tmpl_sz[0])
             self._tmpl_sz[1]=int(self._tmpl_sz[1])
-            print(self._tmpl_sz)
             z = cv2.resize(z, tuple(self._tmpl_sz))
             
 
@@ -261,7 +259,6 @@ class KCFTracker:
         _, pv, _, pi = cv2.minMaxLoc(res)   # pv:float  pi:tuple of int
         p = [float(pi[0]), float(pi[1])]   # cv::Point2f, [x,y]  #[float,float]
             
-        print(pv, pi)
         if(pi[0]>0 and pi[0]<res.shape[1]-1):
             p[0] += self.subPixelPeak(res[pi[1],pi[0]-1], pv, res[pi[1],pi[0]+1])
         if(pi[1]>0 and pi[1]<res.shape[0]-1):

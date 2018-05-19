@@ -11,6 +11,8 @@ from keras_yolo3.yolo import YOLO
 from tracker_pool import LightPool
 from fcrn_depth_prediction.depth import Depth
 
+from Zebra import Zebra
+
 
 
 class BlindNavigator(object):
@@ -21,6 +23,8 @@ class BlindNavigator(object):
         
         self.traffic_light_pool = LightPool()
         self.STATE = ['FORWARD', 'WAIT'] 
+        
+        self.zebra_contours = []
         """
         traffic_light_pool: list of traffic_light time stream
             traffic_light time stream: list of traffic_light, stream[i] is i-th frame's traffic light
@@ -45,6 +49,7 @@ class BlindNavigator(object):
     def color_classify_by_boxes(self, image, boxes, order='012'):
         labels = []
         for box in boxes:
+            box = box.astype(int)
             cropped_image = image[box[1]:box[3], box[0]:box[2], :]
             labels.append(self.color_classify_by_patch(cropped_image, order))
         return labels
@@ -55,10 +60,10 @@ class BlindNavigator(object):
         return estimate_label(img.astype(np.uint8))
     
     def _is_contain_in_triangle(self, traffic_light_center, line_left, line_right):
-        kl = line_left.get_k()
-        bl = line_left.get_b()
-        kr = line_right.get_k()
-        br = line_right.get_b()
+        kl = line_left[0]
+        bl = line_left[1]
+        kr = line_right[0]
+        br = line_right[1]
         
         x, y = traffic_light_center
         
@@ -89,7 +94,7 @@ class BlindNavigator(object):
     def estimate_pedestrain_light(self, image, traffic_lights):
         # traffic lights are loaded from traffic_lights_pool
         # zebra_end_point: tuple (x, y), line: has k and b attribute
-        is_stable, zebra_end_point, line_left, line_right, zebra_contours = self.zebra_detector.predict()
+        is_stable, zebra_end_point, line_left, line_right, self.zebra_contours = self.zebra_detector.predict()
         
         if not is_stable:
             return [2] * len(traffic_lights)
