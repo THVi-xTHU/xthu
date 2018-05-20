@@ -16,8 +16,10 @@ from Zebra import Zebra
 
 class BlindNavigator(object):
     def __init__(self, obstacle_threshold=3):
-        self.detector = YOLO('keras_yolo3/model_data/yolo.h5', anchors_path='keras_yolo3/model_data/yolo_anchors.txt', classes_path='keras_yolo3/model_data/yolo.names')
         self.depth_estimator = Depth(model_path='fcrn_depth_prediction/model/NYU_FCRN.ckpt')
+
+
+        self.detector = YOLO('keras_yolo3/model_data/yolo.h5', anchors_path='keras_yolo3/model_data/yolo_anchors.txt', classes_path='keras_yolo3/model_data/yolo.names')
         self.zebra_detector = Zebra()
         
         self.traffic_light_pool = LightPool()
@@ -25,6 +27,7 @@ class BlindNavigator(object):
         self.alert = None
         self.obstacle_threshold = obstacle_threshold
         self.zebra_contours = []
+        self.is_stable = False
         """
         traffic_light_pool: list of traffic_light time stream
             traffic_light time stream: list of traffic_light, stream[i] is i-th frame's traffic light
@@ -40,7 +43,7 @@ class BlindNavigator(object):
         # detected = [('cls', [array (1, 4) for box]), ...]
         detected = self.detector.predict(image)
         detected_traffic_lights = np.array([d[1] for d in detected if 'traffic light' in d[0]])
-        detected_obstacles = [d for d in detected if 'traffic light' not in d[0]]
+        detected_obstacles = [{'cls': d[0], 'box': d[1]} for d in detected if 'traffic light' not in d[0]]
         traffic_lights = self.traffic_light_pool.get_boxes(image, detected_traffic_lights)
         print('Detected %d traffic lights, in total %d traffic lights, %d obstacles'%( \
                 len(detected_traffic_lights), len(traffic_lights), len(detected_obstacles)))
@@ -96,9 +99,9 @@ class BlindNavigator(object):
         # traffic lights are loaded from traffic_lights_pool
         # zebra_end_point: tuple (x, y), line: has k and b attribute
         if len(traffic_lights) == 0: return []
-        is_stable, zebra_end_point, line_left, line_right, self.zebra_contours = self.zebra_detector.predict(image)
+        self.is_stable, zebra_end_point, line_left, line_right, self.zebra_contours = self.zebra_detector.predict(image)
         
-        if not is_stable:
+        if not self.is_stable:
             return [2] * len(traffic_lights)
         
         centers = [self._get_box_center(*traffic_light[1]) for traffic_light in traffic_lights]
@@ -136,11 +139,12 @@ class BlindNavigator(object):
 
     def executor(self, image):
         traffic_lights, detected_obstacles = self.detect_traffic_light(image)
+        self.compute_distance_of_obstacles(image, detected_obstacles)
+        
         light_states = self.color_classify_by_boxes(image, [light[1] for light in traffic_lights])
         light_types = self.estimate_pedestrain_light(image, traffic_lights)
         self.traffic_light_pool.set_types(light_types)
         self.traffic_light_pool.set_states(light_states)
-        print(light_types)
         self.traffic_light_pool.set_pedestrain_light()
         plight = self.traffic_light_pool.get_pedestrain_light()
         if plight:
@@ -170,7 +174,7 @@ class BlindNavigator(object):
             elif self.state == 'ARRIVE':
                 self.state = 'LIGHT_WAIT'
        
-        return
+        return plight, detected_obstacles, traffic_lights,light_states
     
 
 

@@ -45,9 +45,9 @@ class Zebra(object):
     #process a frame
     def process(self, im):
         #start = timeit.timeit() #start timer
+
         #initialize some variables
-        H, W = im.shape[:2]
-        #H, W = im.shape
+        H, W = im.shape
         x = W
         y = H
 
@@ -166,7 +166,7 @@ class Zebra(object):
         intersectionX,intersectionY = self.lineIntersect(m_R,b_R,m_L,b_L)
 
         #7. draw the bounding lines and the intersection point
-        m = radius*10
+        #m = radius*10
         # if (intersectionY < H/2 ):
         #     cv2.circle(im,(int(intersectionX),int(intersectionY)),10,(0,0,255),15)
         #     cv2.line(im,(x0-m*vx, y0-m*vy), (x0+m*vx, y0+m*vy),(255,0,0),3)
@@ -208,12 +208,12 @@ class Zebra(object):
         intersectionY = 0
         contours = []
         contours_out = []
+        debug_count += 1
         #ret, frame = cap.read()
         #img = scipy.misc.imresize(frame, (H,W))
         #img = image
 
         try:
-            debug_count += 1
             processedFrame,m_L,b_L,m_R,b_R,contours, intersectionX, intersectionY = self.process(image)
 
             # Upate list
@@ -256,10 +256,17 @@ class Zebra(object):
                     bx, by, bw, bh = cv2.boundingRect(j)
                     mid_x = bx + bw / 2
                     mid_y = by + bh / 2
-                    #cv2.circle(processedFrame, (mid_x, mid_y), 63, (0, 0, 255), -1)
-                    if ((m_L * mid_x + b_L < mid_y) and (m_R * mid_x + b_R < mid_y)):
-                        #cv2.rectangle(processedFrame, (bx, by), (bx + bw, by + bh), (180, 237, 167), -1)  # draw the a contour line
-                        contours_out.append(j)
+                    # cv2.circle(processedFrame, (mid_x, mid_y), 63, (0, 0, 255), -1)
+                    H0, W0 = image.shape[:2]
+                    W0 = W0 / 2
+                    sgn0 = ((m_L * W0 + b_L) > H0)
+                    sgn1 = ((m_R * W0 + b_R) > H0)
+                    sgn2 = ((m_L * mid_x + b_L) > mid_y)
+                    sgn3 = ((m_R * mid_x + b_R) > mid_y)
+                    if ((sgn0 == sgn1) and (sgn2 == sgn3)):
+                        # cv2.rectangle(processedFrame, (bx, by), (bx + bw, by + bh), (180, 237, 167), -1)  # draw the a contour line
+                        contours_out.append(contours[j])
+
             else:
                 #print('Frame %s is ok, @Unstable state' % debug_count)
                 is_stable = False

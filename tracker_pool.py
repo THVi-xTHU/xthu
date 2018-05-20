@@ -4,7 +4,7 @@ from sklearn.utils.linear_assignment_ import linear_assignment
 from bbox_transform import bbox_overlaps
 
 class LightTracker(object):
-    def __init__(self, image, bbox, use_hog=True, conf_threshold=0.1, state_len = 10, state_threshold = 0.9):
+    def __init__(self, image, bbox, use_hog=False, conf_threshold=0.1, state_len = 10, state_threshold = 0.9):
         """ type: 0: not pedestrain light, 1: pedestrain light, 2: not determined
             state: 'G', 'R', 'B'
         """
