@@ -121,6 +121,8 @@ class YOLO(object):
             predicted_class = self.class_names[c]
             box = out_boxes[i]
             score = out_scores[i]
+            if score < 0.45:
+                continue
 
             top, left, bottom, right = box
             top = max(0, np.floor(top + 0.5).astype('int32'))

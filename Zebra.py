@@ -45,9 +45,9 @@ class Zebra(object):
     #process a frame
     def process(self, im):
         #start = timeit.timeit() #start timer
-
         #initialize some variables
-        H, W = im.shape
+        H, W = im.shape[:2]
+        #H, W = im.shape
         x = W
         y = H
 
@@ -166,7 +166,7 @@ class Zebra(object):
         intersectionX,intersectionY = self.lineIntersect(m_R,b_R,m_L,b_L)
 
         #7. draw the bounding lines and the intersection point
-        #m = radius*10
+        m = radius*10
         # if (intersectionY < H/2 ):
         #     cv2.circle(im,(int(intersectionX),int(intersectionY)),10,(0,0,255),15)
         #     cv2.line(im,(x0-m*vx, y0-m*vy), (x0+m*vx, y0+m*vy),(255,0,0),3)
@@ -208,12 +208,12 @@ class Zebra(object):
         intersectionY = 0
         contours = []
         contours_out = []
-        debug_count += 1
         #ret, frame = cap.read()
         #img = scipy.misc.imresize(frame, (H,W))
         #img = image
 
         try:
+            debug_count += 1
             processedFrame,m_L,b_L,m_R,b_R,contours, intersectionX, intersectionY = self.process(image)
 
             # Upate list

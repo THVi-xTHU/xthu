@@ -90,6 +90,6 @@ def red_green_yellow(rgb_image):
   sum_red = findNonZero(red_result)
 
   sums = [sum_red, sum_yellow, sum_green]
-  if max(sums) <  0.01 * area:
-    return 'B'
-  return ('R', 'Y', 'G')[np.argmax(sums)]
+#   if max(sums) <  0.01 * area:
+#     return 'B'
+  return ('R', 'R', 'G')[np.argmax(sums)]

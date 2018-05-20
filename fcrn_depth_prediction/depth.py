@@ -9,11 +9,12 @@ class Depth(object):
         self.input_width = 304
         self.input_channels = 3
         self.batch_size = 1
+        self.scale = 5
         self.model_path = model_path
 #         tf.reset_default_graph()
         self.saver = tf.train.Saver()    
         self.sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
- 
+         
 
 
     def load_model(self):
@@ -35,7 +36,7 @@ class Depth(object):
         img = np.array(img).astype('float32')
         img = np.expand_dims(np.asarray(img), axis = 0)
         pred = self.sess.run(self.net.get_output(), feed_dict={self.input_node: img})
-        return pred[:, :, 0]
+        return pred[:, :, 0] * self.scale
 
     def __del__(self):
         self.sess.close()

@@ -303,7 +303,6 @@ def PCAFeatureMaps(mapp):
     ###
 
     mapp['numFeatures'] = pp
-    print(newData)
     mapp['map'] = newData
 
     return mapp

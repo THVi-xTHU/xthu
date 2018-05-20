@@ -4,24 +4,27 @@ from sklearn.utils.linear_assignment_ import linear_assignment
 from bbox_transform import bbox_overlaps
 
 class LightTracker(object):
-    def __init__(self, image, bbox, use_hog=True, conf_threshold=0.1):
+    def __init__(self, image, bbox, use_hog=True, conf_threshold=0.1, state_len = 10, state_threshold = 0.9):
         """ type: 0: not pedestrain light, 1: pedestrain light, 2: not determined
-            state: 'G', 'R', 'Y', 'B'
+            state: 'G', 'R', 'B'
         """
         self.tracker = KCFTracker(use_hog, True, True) # hog, fixed_window, multiscale
         self.bbox = two_point2point_size(bbox)
         self.tracker.init(self.bbox, image)
         self.type_hist = []
+        self.state_hist = []
         self.pc = [0, 0, 0] # number of pedestrain, non-pedestrain, not-determined
         self.type = 0 
+        self.state_len = state_len
+        self.state_threshold = state_threshold
         self.state = 'B' 
         self.hit = 1
+        self.detected = 1
         self.conf_threshold = conf_threshold
         self.confidence = 0.     # The confidence of light being a pedestrain light
 
     def predict(self, image):
         pbox, peak_value = self.tracker.predict(image)
-
         if peak_value < self.conf_threshold:
             self.hit -= 1
         else:
@@ -36,11 +39,11 @@ class LightTracker(object):
         length = len(self.type_hist)
         if length == 0:
             return 0
-        if self.pc[2] > self.pc[1] and self.pc[2] > self.pc[0]:
+        if (self.pc[0] + self.pc[1]) < 10 and (self.pc[2] > self.pc[1] and self.pc[2] > self.pc[0]):
             self.type = 2
             self.confidence = 0.5
         else:
-            self.confidence = self.pc[0] / (self.pc[0] + self.pc[1])      
+            self.confidence = self.pc[1] / (self.pc[0] + self.pc[1])      
             self.type = int(self.confidence > 0.5)
         return   
 
@@ -53,12 +56,26 @@ class LightTracker(object):
         self.check_pedestrain()
         return self.type
 
-    def set_state(self, state):
-        self.state = state
-
     def get_state(self):
-        return self.state
+        green = sum([ 1 for state in self.state_hist if state == 'G'])
+        red = sum([ 1 for state in self.state_hist if state == 'R'])
+        black = sum([ 1 for state in self.state_hist if state == 'B'])
 
+        if green > self.state_threshold * ( red + green ):
+            self.state = 'G'
+        elif red > green and red > black:
+            self.state = 'R'
+        else:
+            self.state = 'B'
+        return self.state
+    
+    def get_bbox(self):
+        return point_size2two_point(self.bbox)
+    
+    def add_state(self, state):
+        self.state_hist.append(state)
+        self.state_hist = self.state_hist[- self.state_len:]
+        
     def add_type(self, typ):
         self.type_hist.append(typ)
         self.pc[typ] += 1
@@ -95,8 +112,13 @@ class LightPool(object):
         self.trackers.append(new_tracker)
     
     def remove_tracker(self):
-        return [tracker for tracker in self.trackers if tracker.hit >= -1]
-
+        keep_indices = [i for i, tracker in enumerate(self.trackers) if tracker.hit >= -1 and tracker.detected >= -10 ]
+        if 0 not in keep_indices:
+            self.forward_max_times = 0
+            self.cur_max_times = 0
+            self.pedestrain_light = None
+        return [ self.trackers[i] for i in keep_indices ]
+        
     def predict(self, image):
         est_boxes = []
         valid_indexes = []
@@ -125,6 +147,7 @@ class LightPool(object):
             if overlaps[matched[0], matched[1]] > self.iou_threshold:
                 merged_boxes.append((matched[0], dboxes[matched[1], :]))
                 self.trackers[matched[0]].rectify(dboxes[matched[1], :])
+                self.trackers[matched[0]].detected += 1
                                 
         # new detected traffic lights
         for i in range(dboxes.shape[0]):
@@ -137,25 +160,27 @@ class LightPool(object):
             if matched_indices.shape[0] == 0 or i not in matched_indices[:, 0]:
                 if valid_indexes[i] >  self.conf_threshold:
                     merged_boxes.append((i, tboxes[i, :]))
-        
+                self.trackers[i].detected -= 1
+                
         self.output_boxes = merged_boxes
         return self.output_boxes
     
     def set_types(self, types):
         for (id_, boxes), typ in zip(self.output_boxes, types):
             self.trackers[id_].add_type(typ)
-            if self.trackers[id_].pc[typ] > self.forward_max_times:
-                self.forward_max_times = self.trackers[id_].pc[typ]
+            if self.trackers[id_].pc[1] > self.forward_max_times:
+                self.forward_max_times = self.trackers[id_].pc[1]
             
     def set_states(self, states):
         for (id_, boxes), state in zip(self.output_boxes, states):
-            self.trackers[id_].set_state(state)
+            self.trackers[id_].add_state(state)
            
     def set_pedestrain_light(self):
         """
         Return pedestrain light: if not sure, return None, else return the tracker. 
         It shuffles the tracker order to put the pedestrain light in the queue front.
         """
+        print('Cur Max Pedestrain Light vote %d, Forward Max Pedestrain Light vote %d'%(self.cur_max_times, self.forward_max_times))
         arg_max = []
         if len(self.trackers) == 0:
             self.pedestrain_light = None
@@ -170,13 +195,18 @@ class LightPool(object):
             self.cur_max_times = self.forward_max_times
             for i, tracker in enumerate(self.trackers):
                 if tracker.get_type() == 1:
-                    c = tracker.get_pc()
+                    c = tracker.pc[1]
                     if c == self.forward_max_times:
                         arg_max.append(i)
             if self.cur_max_times < 5:
                 self.pedestrain_light = None
                 return
-            assert len(arg_max) == 1, 'ambigious! two pedestrain light in view.'
+            try:
+                assert len(arg_max) == 1, 'ambigious! two pedestrain light in view.'
+            except:
+                import pdb
+                pdb.set_trace()
+            print('Tracker %d has been determined as pedestrain light %d times '%(arg_max[0], self.forward_max_times))
             tmp = self.trackers[arg_max[0]]
             del self.trackers[arg_max[0]]
             self.trackers.insert(0, tmp)

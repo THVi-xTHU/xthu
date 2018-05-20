@@ -11,3 +11,5 @@ data
 */model/*
 .ipynb_checkpoints/
 */__pycache__/*
+.*.swp
+*/.*.swp
