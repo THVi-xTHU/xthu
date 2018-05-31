@@ -43,12 +43,15 @@ class BlindNavigator(object):
         # detected = [('cls', [array (1, 4) for box]), ...]
         detected = self.detector.predict(image)
         detected_traffic_lights = np.array([d[1] for d in detected if 'traffic light' in d[0]])
+        detected_traffic_lights_scores = np.array([d[2] for d in detected if 'traffic light' in d[0]])
+
+
         detected_obstacles = [{'cls': d[0], 'box': d[1]} for d in detected if 'traffic light' not in d[0]]
-        traffic_lights = self.traffic_light_pool.get_boxes(image, detected_traffic_lights)
+        traffic_lights = self.traffic_light_pool.get_boxes(image, detected_traffic_lights, detected_traffic_lights_scores)
         print('Detected %d traffic lights, in total %d traffic lights, %d obstacles'%( \
                 len(detected_traffic_lights), len(traffic_lights), len(detected_obstacles)))
 
-        return traffic_lights, detected_obstacles
+        return traffic_lights, detected_obstacles 
     
     def color_classify_by_boxes(self, image, boxes, order='012'):
         labels = []

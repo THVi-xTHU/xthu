@@ -2,6 +2,7 @@ from KCF.kcftracker import KCFTracker
 from utility import *
 from sklearn.utils.linear_assignment_ import linear_assignment
 from bbox_transform import bbox_overlaps
+from non_maximum_suppression import non_max_suppression_slow
 
 class LightTracker(object):
     def __init__(self, image, bbox, use_hog=False, conf_threshold=0.1, state_len = 10, state_threshold = 0.9):
@@ -57,6 +58,18 @@ class LightTracker(object):
         return self.type
 
     def get_state(self):
+        return self.state
+    
+    def get_bbox(self):
+        return point_size2two_point(self.bbox)
+    
+    def add_state(self, state):
+        self.state_hist.append(state)
+        print(self.state_hist)
+        self.state_hist = self.state_hist[- self.state_len:]
+        print(self.state_hist)
+
+
         green = sum([ 1 for state in self.state_hist if state == 'G'])
         red = sum([ 1 for state in self.state_hist if state == 'R'])
         black = sum([ 1 for state in self.state_hist if state == 'B'])
@@ -67,14 +80,8 @@ class LightTracker(object):
             self.state = 'R'
         else:
             self.state = 'B'
-        return self.state
-    
-    def get_bbox(self):
-        return point_size2two_point(self.bbox)
-    
-    def add_state(self, state):
-        self.state_hist.append(state)
-        self.state_hist = self.state_hist[- self.state_len:]
+        print('G: ', green, ', R: ', red, ', B: ', black, ', State_HIST: ', self.state_hist, self.state)
+        
         
     def add_type(self, typ):
         self.type_hist.append(typ)
@@ -129,7 +136,7 @@ class LightPool(object):
         est_boxes = np.array(est_boxes).reshape(-1, 4)
         return est_boxes, valid_indexes
 
-    def get_boxes(self, image, dboxes):
+    def get_boxes(self, image, dboxes, scores):
         """
         output_boxes = [(id_in_pool, (x1, y1, x2, y2)), ...]
         """
@@ -145,35 +152,45 @@ class LightPool(object):
         merged_boxes = []
         for matched in matched_indices:
             if overlaps[matched[0], matched[1]] > self.iou_threshold:
-                merged_boxes.append((matched[0], dboxes[matched[1], :]))
+                merged_boxes.append((matched[0], dboxes[matched[1], :], 'd&t'))
                 self.trackers[matched[0]].rectify(dboxes[matched[1], :])
                 self.trackers[matched[0]].detected += 1
-                                
+                
+        all_boxes =  np.vstack((dboxes, tboxes))
+        all_boxes = np.hstack((np.ones((dboxes.shape[0] + tboxes.shape[0], )), all_boxes))
+        all_boxes[:dboxes.shape[0], 0] = scores[:] + 1
+        all_boxes[dboxes.shape[0]:, 0] = overlaps.max(axis=1)
+        import pdb
+        pdb.set_trace()
+
+
+        non_max_suppression_slow(all_boxes, 0.5)
         # new detected traffic lights
         for i in range(dboxes.shape[0]):
             if matched_indices.shape[0] == 0 or i not in matched_indices[:, 1]:
-                merged_boxes.append((len(self.trackers), dboxes[i, :]))
+                merged_boxes.append((len(self.trackers), dboxes[i, :], 'd'))
                 self.add_tracker(image, dboxes[i, :])
         
         # tracked but not detected traffic lights
         for i in range(tboxes.shape[0]):
             if matched_indices.shape[0] == 0 or i not in matched_indices[:, 0]:
                 if valid_indexes[i] >  self.conf_threshold:
-                    merged_boxes.append((i, tboxes[i, :]))
+                    merged_boxes.append((i, tboxes[i, :], 't'))
                 self.trackers[i].detected -= 1
-                
+        print(dboxes, tboxes, matched_indices, merged_boxes)
         self.output_boxes = merged_boxes
         return self.output_boxes
     
     def set_types(self, types):
-        for (id_, boxes), typ in zip(self.output_boxes, types):
+        for (id_, boxes, _), typ in zip(self.output_boxes, types):
             self.trackers[id_].add_type(typ)
             if self.trackers[id_].pc[1] > self.forward_max_times:
                 self.forward_max_times = self.trackers[id_].pc[1]
             
     def set_states(self, states):
-        for (id_, boxes), state in zip(self.output_boxes, states):
+        for (id_, boxes, _), state in zip(self.output_boxes, states):
             self.trackers[id_].add_state(state)
+
            
     def set_pedestrain_light(self):
         """
