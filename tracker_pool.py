@@ -4,6 +4,7 @@ from sklearn.utils.linear_assignment_ import linear_assignment
 from bbox_transform import bbox_overlaps
 from non_maximum_suppression import non_max_suppression_slow
 
+
 class LightTracker(object):
     def __init__(self, image, bbox, use_hog=False, conf_threshold=0.1, state_len = 10, state_threshold = 0.9):
         """ type: 0: not pedestrain light, 1: pedestrain light, 2: not determined
@@ -117,6 +118,9 @@ class LightPool(object):
     def add_tracker(self, image, bbox):
         new_tracker = LightTracker(image, bbox, self.use_hog, self.conf_threshold)
         self.trackers.append(new_tracker)
+        
+    def count(self):
+        return len(self.trackers)
     
     def remove_tracker(self):
         keep_indices = [i for i, tracker in enumerate(self.trackers) if tracker.hit >= -1 and tracker.detected >= -10 ]
@@ -143,52 +147,62 @@ class LightPool(object):
         self.remove_tracker()
         tboxes, valid_indexes = self.predict(image)
         
+        keep_dboxes_idx = non_max_suppression_slow(dboxes, scores, 0.5)
+        dboxes = dboxes[keep_dboxes_idx]
+        
         overlaps = bbox_overlaps(tboxes, dboxes)
+#         all_scores = np.ones((dboxes.shape[0] + tboxes.shape[0],))
+#         all_scores[:dboxes.shape[0]] = scores[:] + 1
+        
         if np.prod(overlaps.shape) != 0:
+            tscores = overlaps.max(axis=1)
+            keep_tboxes_idx = non_max_suppression_slow(tboxes, tscores, 0.5)
+            tboxes = tboxes[keep_tboxes_idx]
             matched_indices = linear_assignment(-overlaps)
         else:
             matched_indices = np.array([])
         
         merged_boxes = []
+        merged_idx = []
+        d_or_t = []
         for matched in matched_indices:
             if overlaps[matched[0], matched[1]] > self.iou_threshold:
-                merged_boxes.append((matched[0], dboxes[matched[1], :], 'd&t'))
+                merged_idx.append(matched[0])
+                merged_boxes.append(dboxes[matched[1], :])
+                d_or_t.append('d&t')
                 self.trackers[matched[0]].rectify(dboxes[matched[1], :])
                 self.trackers[matched[0]].detected += 1
-                
-        all_boxes =  np.vstack((dboxes, tboxes))
-        all_boxes = np.hstack((np.ones((dboxes.shape[0] + tboxes.shape[0], )), all_boxes))
-        all_boxes[:dboxes.shape[0], 0] = scores[:] + 1
-        all_boxes[dboxes.shape[0]:, 0] = overlaps.max(axis=1)
-        import pdb
-        pdb.set_trace()
-
-
-        non_max_suppression_slow(all_boxes, 0.5)
+        
         # new detected traffic lights
         for i in range(dboxes.shape[0]):
             if matched_indices.shape[0] == 0 or i not in matched_indices[:, 1]:
-                merged_boxes.append((len(self.trackers), dboxes[i, :], 'd'))
+                merged_idx.append(self.count())
+                merged_boxes.append(dboxes[i, :])
+                d_or_t.append('d')
                 self.add_tracker(image, dboxes[i, :])
         
         # tracked but not detected traffic lights
         for i in range(tboxes.shape[0]):
             if matched_indices.shape[0] == 0 or i not in matched_indices[:, 0]:
                 if valid_indexes[i] >  self.conf_threshold:
-                    merged_boxes.append((i, tboxes[i, :], 't'))
+                    merged_idx.append(i)
+                    merged_boxes.append(tboxes[i, :])
+                    d_or_t.append('t')
                 self.trackers[i].detected -= 1
-        print(dboxes, tboxes, matched_indices, merged_boxes)
+                
+        print(dboxes, tboxes, matched_indices, merged_boxes, d_or_t)
         self.output_boxes = merged_boxes
-        return self.output_boxes
+        self.boxes_idx = merged_idx
+        return merged_idx, merged_boxes
     
     def set_types(self, types):
-        for (id_, boxes, _), typ in zip(self.output_boxes, types):
+        for id_, boxes, typ in zip(self.boxes_idx, self.output_boxes, types):
             self.trackers[id_].add_type(typ)
             if self.trackers[id_].pc[1] > self.forward_max_times:
                 self.forward_max_times = self.trackers[id_].pc[1]
             
     def set_states(self, states):
-        for (id_, boxes, _), state in zip(self.output_boxes, states):
+        for id_, boxes, state in zip(self.boxes_idx, self.output_boxes, states):
             self.trackers[id_].add_state(state)
 
            

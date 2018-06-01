@@ -12,20 +12,17 @@ from tracker_pool import LightPool
 from fcrn_depth_prediction.depth import Depth
 
 from Zebra import Zebra
-
+from hyperparams import *
 
 class BlindNavigator(object):
-    def __init__(self, obstacle_threshold=3):
-        self.depth_estimator = Depth(model_path='fcrn_depth_prediction/model/NYU_FCRN.ckpt')
-
-
-        self.detector = YOLO('keras_yolo3/model_data/yolo.h5', anchors_path='keras_yolo3/model_data/yolo_anchors.txt', classes_path='keras_yolo3/model_data/yolo.names')
+    def __init__(self):
+        self.depth_estimator = Depth(path['FCRN'])
+        self.detector = YOLO(path['YOLO'], path['YOLO_anchor'], path['YOLO_classes'])
         self.zebra_detector = Zebra()
         
         self.traffic_light_pool = LightPool()
         self.state = 'LIGHT_WAIT'
         self.alert = None
-        self.obstacle_threshold = obstacle_threshold
         self.zebra_contours = []
         self.is_stable = False
         """
@@ -47,11 +44,11 @@ class BlindNavigator(object):
 
 
         detected_obstacles = [{'cls': d[0], 'box': d[1]} for d in detected if 'traffic light' not in d[0]]
-        traffic_lights = self.traffic_light_pool.get_boxes(image, detected_traffic_lights, detected_traffic_lights_scores)
+        light_idx, traffic_lights = self.traffic_light_pool.get_boxes(image, detected_traffic_lights, detected_traffic_lights_scores)
         print('Detected %d traffic lights, in total %d traffic lights, %d obstacles'%( \
                 len(detected_traffic_lights), len(traffic_lights), len(detected_obstacles)))
 
-        return traffic_lights, detected_obstacles 
+        return light_idx, traffic_lights, detected_obstacles 
     
     def color_classify_by_boxes(self, image, boxes, order='012'):
         labels = []
@@ -102,12 +99,12 @@ class BlindNavigator(object):
         # traffic lights are loaded from traffic_lights_pool
         # zebra_end_point: tuple (x, y), line: has k and b attribute
         if len(traffic_lights) == 0: return []
-        self.is_stable, zebra_end_point, line_left, line_right, self.zebra_contours = self.zebra_detector.predict(image)
+        _, self.is_stable, zebra_end_point, line_left, line_right, self.zebra_contours = self.zebra_detector.predict(image)
         
         if not self.is_stable:
             return [2] * len(traffic_lights)
         
-        centers = [self._get_box_center(*traffic_light[1]) for traffic_light in traffic_lights]
+        centers = [self._get_box_center(*traffic_light) for traffic_light in traffic_lights]
         ind = self._get_valid_traffic_light(centers, zebra_end_point, line_left, line_right)
         
         light_type = [0] * len(traffic_lights)
@@ -141,10 +138,10 @@ class BlindNavigator(object):
         return True
 
     def executor(self, image):
-        traffic_lights, detected_obstacles = self.detect_traffic_light(image)
+        light_idx, traffic_lights, detected_obstacles = self.detect_traffic_light(image)
         self.compute_distance_of_obstacles(image, detected_obstacles)
         
-        light_states = self.color_classify_by_boxes(image, [light[1] for light in traffic_lights])
+        light_states = self.color_classify_by_boxes(image, traffic_lights)
         light_types = self.estimate_pedestrain_light(image, traffic_lights)
         self.traffic_light_pool.set_types(light_types)
         self.traffic_light_pool.set_states(light_states)
@@ -159,15 +156,15 @@ class BlindNavigator(object):
             elif self.state == 'START_FORWARD':
                 if plight.get_state() == 'R':
                     self.state = 'LIGHT_WAIT'
-                if self._has_obstacle(detected_obstacles, self.obstacle_threshold):
+                if self._has_obstacle(detected_obstacles, obstacle_threshold):
                     self.state = 'CROSS_WAIT'
             elif self.state == 'CROSS_WAIT':
-                if not self._has_obstacle(detected_obstacles, self.obstacle_threshold):
+                if not self._has_obstacle(detected_obstacles, obstacle_threshold):
                     self.state = 'CROSS_FORWARD'
                 if plight.get_state() == 'R':
                     self.alert = 'CROSS_RED'
             elif self.state == 'CROSS_FORWARD':
-                if self._has_obstacle(detected_obstacles, self.obstacle_threshold):
+                if self._has_obstacle(detected_obstacles, obstacle_threshold):
                     self.state = 'CROSS_WAIT' 
                 if plight.get_state() == 'R':
                     self.alert = 'CROSS_RED'
@@ -177,7 +174,7 @@ class BlindNavigator(object):
             elif self.state == 'ARRIVE':
                 self.state = 'LIGHT_WAIT'
        
-        return plight, detected_obstacles, traffic_lights,light_states
+        return plight, detected_obstacles, light_idx, traffic_lights, light_states
     
 
 

@@ -2,7 +2,7 @@
 import numpy as np
 
 #  Felzenszwalb et al.
-def non_max_suppression_slow(boxes, overlapThresh):
+def non_max_suppression_slow(boxes, scores, overlapThresh):
     # if there are no boxes, return an empty list
     if len(boxes) == 0:
         return []
@@ -15,11 +15,10 @@ def non_max_suppression_slow(boxes, overlapThresh):
     y1 = boxes[:,1]
     x2 = boxes[:,2]
     y2 = boxes[:,3]
-    score = boxes[:,4]
     # compute the area of the bounding boxes and sort the bounding
     # boxes by the bottom-right y-coordinate of the bounding box
     area = (x2 - x1 + 1) * (y2 - y1 + 1)
-    idxs = np.argsort(score)
+    idxs = np.argsort(scores)
     # keep looping while some indexes still remain in the indexes
     # list
     while len(idxs) > 0:
@@ -32,7 +31,7 @@ def non_max_suppression_slow(boxes, overlapThresh):
         pick.append(i)
         suppress = [last]
         # loop over all indexes in the indexes list
-        for pos in xrange(0, last):
+        for pos in range(last):
             # grab the current index
             j = idxs[pos]
 
