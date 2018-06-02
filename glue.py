@@ -40,6 +40,13 @@ class BlindNavigator(object):
         # detected = [('cls', [array (1, 4) for box]), ...]
         detected_boxlist = self.detector.predict(image)
         detected_lights = detected_boxlist.get_specific_data('classes', 'traffic light')
+        boxes = detected_lights.get()
+        width = boxes[:, 2] - boxes[:, 0]
+        height = boxes[:, 3] - boxes[:, 1]
+        keep_idx = (height / width) >= ASPECT_RATIO_THRESHOLD
+#         print('origin: ', detected_lights.get())
+        detected_lights.keep_indices(keep_idx)
+#         print('filtered: ', detected_lights.get())
         detected_obstacles = detected_boxlist.exclude_specific_data('classes', 'traffic light')
         traffic_lights = self.traffic_light_pool.get_boxes(image, detected_lights)
         print('Detected %d traffic lights, in total %d traffic lights, %d obstacles'%( \
@@ -123,6 +130,8 @@ class BlindNavigator(object):
             cropped_depth = depth[ymin: ymax, xmin: xmax]
             od.append(np.median(cropped_depth.ravel()))
             # od.append('10')
+        print('add distances: ', od)
+        print('depth: ', depth)
         obstacles.add_field('distances', od)
             
     def arrive(self, image):
@@ -133,7 +142,8 @@ class BlindNavigator(object):
     def _has_obstacle(self, obstacles, thresh=1):
         dist = obstacles.get_field('distances')
         closet_obs_depth = min(dist)
-        if closet_obs_depth < thresh:
+        print('dist: ', dist)
+        if closet_obs_depth > thresh:
             return False
         return True
 

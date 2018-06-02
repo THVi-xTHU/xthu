@@ -8,7 +8,7 @@ from util.box_list_ops import *
 from hyperparams import *
 
 class LightTracker(object):
-    def __init__(self, image, bbox, use_hog=False, conf_threshold=0.1, state_len = 10, state_threshold = 0.9):
+    def __init__(self, image, bbox, use_hog=False):
         """ type: 0: not pedestrain light, 1: pedestrain light, 2: not determined
             state: 'G', 'R', 'B'
         """
@@ -19,17 +19,46 @@ class LightTracker(object):
         self.state_hist = []
         self.pc = [0, 0, 0] # number of pedestrain, non-pedestrain, not-determined
         self.type = 0 
-        self.state_len = state_len
-        self.state_threshold = state_threshold
-        self.state = 'B' 
-        self.hit = 1
-        self.detected = 1
-        self.conf_threshold = conf_threshold
+        self.state = 'B'
+        self.verified = False
+        self._hit = 1
+        self._chit = 1
+        self._detected = 1
         self.confidence = 0.     # The confidence of light being a pedestrain light
+        
+    @property
+    def hit(self):
+        return self._hit
+    
+    @hit.setter
+    def hit(self, val):
+        if self._hit < TYPE_LEN:
+            self._hit = val
+
+             
+    @property
+    def chit(self):
+        return self._chit
+    
+    @chit.setter
+    def chit(self, val):
+        if self._chit < TYPE_LEN:
+            self._chit = val
+        if self._chit >= MIN_DET_COUNT:
+            self.verified = True
+            
+    @property
+    def detected(self):
+        return self._detected
+    
+    @detected.setter
+    def detected(self, val):
+        if self._detected < TYPE_LEN:
+            self._detected = val
 
     def predict(self, image):
         pbox, peak_value = self.tracker.predict(image)
-        if peak_value < self.conf_threshold:
+        if peak_value < TCONF_THRESHOLD:
             self.hit -= 1
         else:
             self.bbox = pbox
@@ -38,17 +67,22 @@ class LightTracker(object):
     def rectify(self, bbox):
         self.bbox = two_point2point_size(bbox)
         self.hit += 1
-    
+     
     def check_pedestrain(self):
         length = len(self.type_hist)
         if length == 0:
             return 0
-        if (self.pc[0] + self.pc[1]) < 10 and (self.pc[2] > self.pc[1] and self.pc[2] > self.pc[0]):
+        if len(self.type_hist) < TYPE_WAIT_LEN:
             self.type = 2
-            self.confidence = 0.5
+            self.confidence = CONF_AVERAGE
         else:
-            self.confidence = self.pc[1] / (self.pc[0] + self.pc[1])      
-            self.type = int(self.confidence > 0.5)
+            self.confidence = self.pc[1] / (self.pc[0] + self.pc[1])
+            if self.confidence > TYPE_THRESHOLD:
+                self.type = 1
+            elif self.confidence < 1 - TYPE_THRESHOLD:
+                self.type = 0
+            else:
+                self.type = 2
         return   
 
     def get_confidence(self):
@@ -69,7 +103,7 @@ class LightTracker(object):
     def add_state(self, state):
         self.state_hist.append(state)
         print(self.state_hist)
-        self.state_hist = self.state_hist[- self.state_len:]
+        self.state_hist = self.state_hist[- STATE_LEN:]
         print(self.state_hist)
 
 
@@ -77,7 +111,7 @@ class LightTracker(object):
         red = sum([ 1 for state in self.state_hist if state == 'R'])
         black = sum([ 1 for state in self.state_hist if state == 'B'])
 
-        if green > self.state_threshold * ( red + green ):
+        if green > STATE_THRESHOLD * ( red + green ):
             self.state = 'G'
         elif red > green and red > black:
             self.state = 'R'
@@ -87,14 +121,19 @@ class LightTracker(object):
         
         
     def add_type(self, typ):
-        self.type_hist.append(typ)
-        self.pc[typ] += 1
+        if typ != 2:
+            self.type_hist.append(typ)
+            self.pc[typ] += 1
+        if len(self.type_hist) == TYPE_LEN:
+            pop_typ = self.type_hist.pop(0)
+            self.pc[pop_typ] -= 1
             
+
     def get_hit(self):
         return self.hit
 
 class LightPool(object):
-    def __init__(self, use_hog = True, conf_threshold = 0.1, iou_threshold = 0.5, reliable_count = 5):
+    def __init__(self, use_hog = True):
         """
         Workflow: get_boxes() -> set_types() and set_states() -> set_pedestrain_light()
         The light pool: 
@@ -109,16 +148,13 @@ class LightPool(object):
         """
         self.trackers = []
         self.use_hog = use_hog
-        self.conf_threshold = conf_threshold          # threshold for kcf peak value
-        self.iou_threshold = iou_threshold            # threshold for det-track matching overlap iou
-        self.reliable_count = reliable_count          # minimum count for a light treated as pedestrain light
         self.cur_max_times = 0                         # max times of a tracker determinated as pedestrain light 
         self.forward_max_times = 0                     # new max times
         self.output_boxlist = None
         self.pedestrain_light = None
         
     def add_tracker(self, image, bbox):
-        new_tracker = LightTracker(image, bbox, self.use_hog, self.conf_threshold)
+        new_tracker = LightTracker(image, bbox)
         self.trackers.append(new_tracker)
         
     def count(self):
@@ -126,11 +162,23 @@ class LightPool(object):
     
     def remove_tracker(self):
         keep_indices = [i for i, tracker in enumerate(self.trackers) if tracker.hit >= -1 and tracker.detected >= -10 ]
+        if self.forward_max_times > TYPE_WAIT_LEN * TYPE_THRESHOLD and 0 not in keep_indices and len(self.trackers) > 0:        
+            print('Remove current tracker, the tracker has hit %d, detected %d'%(
+                self.trackers[0].hit, self.trackers[0].detected))
+            print('Tracker Info: forward pc %d, cur pc %d, tracker pc %d:'%(self.forward_max_times, self.cur_max_times, self.trackers[0].pc[1]), self.trackers[0].get_bbox())
+        self.trackers = [self.trackers[i] for i in keep_indices]
         if 0 not in keep_indices:
-            self.forward_max_times = 0
-            self.cur_max_times = 0
-            self.pedestrain_light = None
-        return [ self.trackers[i] for i in keep_indices]
+            # TODO, refind the forward max time
+            if keep_indices:
+                cur_tracker = np.array([tracker.pc[1] for tracker in self.trackers])
+                max_id = cur_tracker.argmax()
+                self.trackers[0], self.trackers[max_id] = self.trackers[max_id], self.trackers[0]
+                self.forward_max_times = cur_tracker[max_id]
+                self.cur_max_times = cur_tracker[max_id]
+            else:
+                self.forward_max_times = 0
+                self.cur_max_times = 0
+        return 
         
     def predict(self, image):
         est_boxes = []
@@ -154,17 +202,21 @@ class LightPool(object):
         dboxes = dbox_list.get()
         dscores = dbox_list.get_field('scores')
         
-        keep_dboxes_idx = non_max_suppression_slow(dboxes, dscores, nms_thresh)
+        keep_dboxes_idx = non_max_suppression_slow(dboxes, dscores, NMS_THRESHOLD)
 
-        dbox_list.keep_indices(keep_dboxes_idx)
-        
+        dbox_list.keep_indices(sorted(keep_dboxes_idx))
+
         overlaps = iou(tbox_list, dbox_list)
-        
+        print(dboxes, '\n', tbox_list.get(), overlaps)
+
         if np.prod(overlaps.shape) != 0:
             tscores = overlaps.max(axis=1)
+
             tbox_list.add_field('scores', tscores)
-            keep_tboxes_idx = non_max_suppression_slow(tbox_list.get(), tscores, nms_thresh)
-            tbox_list.keep_indices(keep_tboxes_idx)
+            keep_tboxes_idx = non_max_suppression_slow(tbox_list.get(), tscores, NMS_THRESHOLD)
+
+            tbox_list.keep_indices(sorted(keep_tboxes_idx))
+            overlaps = iou(tbox_list, dbox_list)
             matched_indices = linear_assignment(-overlaps)
         else:
             matched_indices = np.array([])
@@ -172,13 +224,20 @@ class LightPool(object):
         merged_boxes = []
         merged_idx = []
         d_or_t = []
-        for matched in matched_indices:
-            if overlaps[matched[0], matched[1]] > self.iou_threshold:
+        keep_indices = []
+        for i, matched in enumerate(matched_indices):
+            if overlaps[matched[0], matched[1]] > IOU_THRESHOLD:
                 merged_idx.append(matched[0])
                 merged_boxes.append(dboxes[matched[1], :])
                 d_or_t.append('d&t')
                 self.trackers[matched[0]].rectify(dboxes[matched[1], :])
                 self.trackers[matched[0]].detected += 1
+                self.trackers[matched[0]].chit += 1
+                keep_indices.append(i)
+        
+        matched_indices = matched_indices[keep_indices]
+        print(overlaps)
+        print(matched_indices)
         
         # new detected traffic lights
         for i in range(dbox_list.num_boxes()):
@@ -188,16 +247,19 @@ class LightPool(object):
                 d_or_t.append('d')
                 self.add_tracker(image, dboxes[i, :])
 
+
         tboxes = tbox_list.get()
         valid_indices = tbox_list.get_field('valid_indices')
         # tracked but not detected traffic lights
         for i in range(tbox_list.num_boxes()):
             if matched_indices.shape[0] == 0 or i not in matched_indices[:, 0]:
-                if valid_indices[i] >  self.conf_threshold:
+                if self.trackers[i].verified and valid_indices[i] >  TCONF_THRESHOLD:
                     merged_idx.append(i)
                     merged_boxes.append(tboxes[i, :])
                     d_or_t.append('t')
                 self.trackers[i].detected -= 1
+                self.trackers[i].chit = 0
+
                 
         print(dboxes, tboxes, matched_indices, merged_boxes, d_or_t)
         self.output_boxlist = BoxList({
@@ -229,27 +291,29 @@ class LightPool(object):
             self.pedestrain_light = None
             return
         if self.forward_max_times == self.cur_max_times:
-            if self.cur_max_times < 5:
-                self.pedestrain_light =  None
+            # if initialize or when no tracker with larger confidence if found
+            if self.cur_max_times >= TYPE_WAIT_LEN * TYPE_THRESHOLD and  self.trackers[0].type == 1:
+                self.pedestrain_light =  self.trackers[0]
             else:
-                self.pedestrain_light = self.trackers[0]
+                self.pedestrain_light =  None
+
             return
         else:
+            # a larger pedestrain number found: 
             self.cur_max_times = self.forward_max_times
             for i, tracker in enumerate(self.trackers):
                 if tracker.get_type() == 1:
                     c = tracker.pc[1]
                     if c == self.forward_max_times:
                         arg_max.append(i)
-            if self.cur_max_times < 5:
-                self.pedestrain_light = None
+            if not arg_max:
                 return
-            try:
-                assert len(arg_max) == 1, 'ambigious! two pedestrain light in view.'
-            except:
-                import pdb
-                pdb.set_trace()
+            
+            if len(arg_max) > 1:
+                print('[LOG] find %d feasible light, cannot decide which pedestrain light is better, wait...'%len(arg_max))
+                return
             print('Tracker %d has been determined as pedestrain light %d times '%(arg_max[0], self.forward_max_times))
+            # insert the selected tracker to front of queue
             tmp = self.trackers[arg_max[0]]
             del self.trackers[arg_max[0]]
             self.trackers.insert(0, tmp)

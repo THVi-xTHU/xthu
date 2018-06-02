@@ -2,6 +2,7 @@ import numpy as np
 import tensorflow as tf
 from PIL import Image
 from . import models
+import cv2
 
 class Depth(object):
     def __init__(self, model_path):
@@ -9,7 +10,7 @@ class Depth(object):
         self.input_width = 304
         self.input_channels = 3
         self.batch_size = 1
-        self.scale = 5
+        self.scale = 1
         self.model_path = model_path
 #         tf.reset_default_graph()
          
@@ -32,15 +33,19 @@ class Depth(object):
         self.saver.restore(self.sess, self.model_path)
         
     def predict(self, img):
-        img = Image.fromarray(img, 'RGB')
+        image = Image.fromarray(img, 'RGB')
 
-        img = img.resize([self.input_width, self.input_height], Image.ANTIALIAS)
+        img = image.resize([self.input_width, self.input_height], Image.ANTIALIAS)
 
         img = np.array(img).astype('float32')
         img = np.expand_dims(np.asarray(img), axis = 0)
         pred = self.sess.run(self.net.get_output(), feed_dict={self.input_node: img})
         print(pred.shape)
-        return pred[0, :, :, 0] * self.scale
+        depth = pred[0, :, :, 0] * self.scale
+       
+        depth = cv2.resize(depth, (image.size[1], image.size[0]), interpolation=cv2.INTER_LINEAR)
+        print(depth.shape)
+        return depth
 
     def __del__(self):
         self.sess.close()

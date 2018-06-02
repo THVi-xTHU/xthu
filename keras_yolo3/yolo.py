@@ -16,6 +16,8 @@ from keras.models import load_model
 from PIL import Image, ImageFont, ImageDraw
 from color_classify import estimate_label
 
+from hyperparams import *
+
 try:
     from .yolo3.model import yolo_eval
     from .yolo3.utils import letterbox_image
@@ -123,7 +125,7 @@ class YOLO(object):
             predicted_class = self.class_names[c]
             box = out_boxes[i]
             score = out_scores[i]
-            if score < 0.45:
+            if score < SCORE_THRESHOLD:
                 continue
 
             top, left, bottom, right = box

@@ -3,14 +3,14 @@ import cv2
 from PIL import Image, ImageFont, ImageDraw
 import colorsys
 
-
+from hyperparams import *
 class Visualizer(object):
   def __init__(self):
 
     with open('keras_yolo3/model_data/yolo.names', 'r') as fr:
       all_classes = fr.read().strip().split('\n')
 
-    hsv_tuples = [(x / len(all_classes), .5, .5)
+    hsv_tuples = [(x / len(all_classes), 0.7, .4)
                   for x in range(len(all_classes))]
     colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
     colors = list(map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)), colors))
@@ -20,7 +20,7 @@ class Visualizer(object):
 
   def depth_to_rgba(self, depth):
     _min = 0
-    _max = 100
+    _max = 30
     
 #     import pdb
 #     pdb.set_trace()
@@ -28,6 +28,8 @@ class Visualizer(object):
 
     hsv = np.ones(depth.shape[:2] + (3,))
     hsv[:, :, 0] = normed_depth
+    hsv[:, :, 1] = 0.5
+    hsv[:, :, 2] = 0.8
     rgba = np.zeros(depth.shape[:2] + (4,))
     rgba[:, :, :3] = cv2.cvtColor((hsv * 255).astype(np.uint8), cv2.COLOR_HSV2RGB)
     rgba = rgba.astype(np.uint8)
@@ -38,26 +40,44 @@ class Visualizer(object):
   def add_mask(self, depth, boxes):
     rgba = self.depth_to_rgba(depth)
     res = np.zeros_like(rgba)
+    d = []
     for box in boxes:
       box = np.array(box).astype(int)
       res[box[1]: box[3], box[0]: box[2], :3] = rgba[box[1]: box[3], box[0]: box[2], :3]
       res[box[1]: box[3], box[0]: box[2], -1] = 128
-    return res
+      d.append(float(np.median(depth[box[1]: box[3], box[0]: box[2]])))
+    return res, d
 
   def add_zebra(self, im, contours):
     for j in contours:
       bx, by, bw, bh = cv2.boundingRect(j)
-      cv2.rectangle(im, (bx, by), (bx + bw, by + bh), (180, 237, 167), -1)
+      cv2.rectangle(im, (bx, by), (bx + bw, by + bh), (220, 252, 255), -1)
     return im
 
-  def add_boxes(self, im, clses, boxes):
+  def add_boxes(self, im, clses, boxes, d):
 
-    font = cv2.FONT_HERSHEY_SIMPLEX
 
-    for cls, box in zip(clses, boxes):
+    img = Image.fromarray(im)
+    for cls, box, d in zip(clses, boxes, d):
       color = self.colors[self.all_classes.index(cls)]
-      cv2.rectangle(im, (box[0], box[1]), (box[2], box[3]), color, 3)
-      cv2.putText(im, '%s' % cls, (box[0] - 1, box[1] - 1), font, 1, color, thickness=2)
+
+      draw = ImageDraw.Draw(img)  # 括号中为需要打印的canvas，这里就是在图片上直接打印
+      label_size = draw.textsize(cls + ' %.1f' % d, efont)
+
+      if box[1] - label_size[1] >= 0:
+        text_origin = np.array([box[0], box[1] - label_size[1]])
+      else:
+        text_origin = np.array([box[0], box[1] + 1])
+
+      for i in range(thickness):
+        draw.rectangle(
+          [box[0] + i, box[1] + i, box[2] - i, box[3] - i],
+          outline=color)
+      draw.rectangle(
+        [tuple(text_origin), tuple(text_origin + label_size)],
+        fill=(0x00, 0x99, 0xFF))
+      draw.text(text_origin, cls + ' %.1f' % d, fill=(255, 255, 255), font=efont)
+    im = np.array(img)
     return im
 
   def add_traffic(self, im, lights, boxes):
@@ -72,21 +92,23 @@ class Visualizer(object):
       cv2.putText(im, '%s' % cls, (box[0] - 1, box[1] - 1), font, 1, color, thickness=1)
     return im
 
-  def plot(self, im, clses, boxes, depth, traffic_lights, is_stable, contours):
+  def plot(self, im, clses, boxes, depth, is_stable, contours):
     
     depth = cv2.resize(depth, (im.shape[1], im.shape[0]), interpolation=cv2.INTER_CUBIC)
+    depth = depth - np.min(depth)
 
 
-    mask = self.add_mask(depth, boxes)
+    mask, d = self.add_mask(depth, boxes)
 
     if is_stable:
       im = self.add_zebra(im, contours)
-    im = self.add_boxes(im, clses, boxes)
+    im = self.add_boxes(im, clses, boxes, d)
+    
 
-    if traffic_lights:
-        light_colors = [l[0] for l in traffic_lights]
-        light_boxes = [l[1] for l in traffic_lights]
-        im = self.add_traffic(im, light_colors, light_boxes)
+    # if traffic_lights:
+    #     light_colors = [l[0] for l in traffic_lights]
+    #     light_boxes = [l[1] for l in traffic_lights]
+    #     im = self.add_traffic(im, light_colors, light_boxes)
     im = cv2.cvtColor(im, cv2.COLOR_BGR2BGRA)
     from PIL import Image
     im = Image.fromarray(im)

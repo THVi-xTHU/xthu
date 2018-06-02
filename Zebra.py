@@ -9,6 +9,7 @@ import glob
 from sklearn import linear_model, datasets
 from collections import deque
 
+
 # get a line from a point and unit vectors
 def lineCalc(vx, vy, x0, y0):
     scale = 10
@@ -61,13 +62,20 @@ def lineIntersect(m1, b1, m2, b2, W, H):
 
     return intersectionX, intersectionY
 
+
 class Zebra(object):
     def __init__(self):
-        self.m_L_list = deque(maxlen=3)
-        self.b_L_list = deque(maxlen=3)
-        self.m_R_list = deque(maxlen=3)
-        self.b_R_list = deque(maxlen=3)
+        qlen = 2
+        draw_qlen = 3
+        self.m_L_list = deque(maxlen=qlen)
+        self.b_L_list = deque(maxlen=qlen)
+        self.m_R_list = deque(maxlen=qlen)
+        self.b_R_list = deque(maxlen=qlen)
 
+        self.draw_m_L_list = deque(maxlen=draw_qlen)
+        self.draw_b_L_list = deque(maxlen=draw_qlen)
+        self.draw_m_R_list = deque(maxlen=draw_qlen)
+        self.draw_b_R_list = deque(maxlen=draw_qlen)
 
     # process a frame
     def process(self, im):
@@ -197,7 +205,6 @@ class Zebra(object):
         #     cv2.line(im,(x0-m*vx, y0-m*vy), (x0+m*vx, y0+m*vy),(255,0,0),3)
         #     cv2.line(im,(x0_R-m*vx_R, y0_R-m*vy_R), (x0_R+m*vx_R, y0_R+m*vy_R),(255,0,0),3)
 
-
         # Tianyi: draw aux linesss and points
         # cv2.circle(im, (int(intersectionX), int(intersectionY)), 10, (0, 0, 255), 15)
         # cv2.line(im, (x0 - m * vx, y0 - m * vy), (x0 + m * vx, y0 + m * vy), (255, 0, 0), 3)
@@ -226,6 +233,7 @@ class Zebra(object):
         # state = ""
         is_stable = False
         contours_out = []
+        # draw_contours_out = []
         # intersectionX = []
         # intersectionY = []
         # m_L = []
@@ -257,8 +265,27 @@ class Zebra(object):
             min_b_R = np.float32(min(list(self.b_R_list)))
             var_b_R = max_b_R - min_b_R
 
+            self.draw_m_L_list.append(m_L)
+            self.draw_b_L_list.append(b_L)
+            self.draw_m_R_list.append(m_R)
+            self.draw_b_R_list.append(b_R)
+
+            draw_max_m_L = np.float32(max(list(self.draw_m_L_list)))
+            draw_min_m_L = np.float32(min(list(self.draw_m_L_list)))
+            draw_var_m_L = draw_max_m_L - draw_min_m_L
+            draw_max_b_L = np.float32(max(list(self.draw_b_L_list)))
+            draw_min_b_L = np.float32(min(list(self.draw_b_L_list)))
+            draw_var_b_L = draw_max_b_L - draw_min_b_L
+
+            draw_max_m_R = np.float32(max(list(self.draw_m_R_list)))
+            draw_min_m_R = np.float32(min(list(self.draw_m_R_list)))
+            draw_var_m_R = draw_max_m_R - draw_min_m_R
+            draw_max_b_R = np.float32(max(list(self.draw_b_R_list)))
+            draw_min_b_R = np.float32(min(list(self.draw_b_R_list)))
+            draw_var_b_R = draw_max_b_R - draw_min_b_R
+
             # if (var_b_L < 100 and var_b_R < 100 and var_m_L < 0.1 and var_m_R < 0.1):
-            if (var_b_L < 1000 and var_b_R < 1000 and var_m_L < 1 and var_m_R < 1):
+            if (var_b_L < 2000 and var_b_R < 2000 and var_m_L < 2 and var_m_R < 2):
                 # if (True):
                 # print('Frame %s is ok, @Stable state' % debug_count)
                 is_stable = True
@@ -268,18 +295,7 @@ class Zebra(object):
                     mid_y = by + bh / 2
 
                     H0, W0 = img.shape[:2]
-                    W0 = W0 / 2
-                    # S1
-                    # sgn0 = ((m_L * W0 + b_L) > H0)
-                    # sgn1 = ((m_R * W0 + b_R) > H0)
-                    # sgn2 = ((m_L * mid_x + b_L) > mid_y)
-                    # sgn3 = ((m_R * mid_x + b_R) > mid_y)
-
-                    # S2
-                    # sgnL = bool((m_L * mid_x + b_L) > mid_y)
-                    # sgnR = bool((m_R * mid_x + b_R) > mid_y)
-
-                    # S3
+                    # W0 = W0 / 2
                     if (m_L > 0):
                         sgnL = bool((m_L * mid_x - mid_y + b_L) > 0)
                     else:
@@ -291,17 +307,23 @@ class Zebra(object):
 
                     # cv2.circle(processedFrame, (mid_x, mid_y), 63, (0, 0, 255), -1)
                     # if ((m_L * mid_x + b_L < mid_y) and (m_R * mid_x + b_R < mid_y)):
-                    if (mid_y > intersectionY):
-                        # if ((sgn0 == sgn2) and (sgn1 == sgn3)):
-                        if (sgnL ^ sgnR == True):
-                            cv2.rectangle(processedFrame, (bx, by), (bx + bw, by + bh), (255, 255, 255), -1)  # (180, 237, 167)
-                            contours_out.append(j)
+
+                    if (draw_var_b_L < 1000 and draw_var_b_R < 1000 and draw_var_m_L < 1 and draw_var_m_R < 1):
+                        if (mid_y > intersectionY and bw > W0 * 0.1 and bw < W0 * 0.8 and bh < 0.14 * H0):
+                        # if (mid_y > intersectionY and bw > W0 * 0.2 and bw < W0 * 0.8 and bh < 0.115 * H0):
+                        # if (mid_y > intersectionY):
+                            # if ((sgn0 == sgn2) and (sgn1 == sgn3)):
+                            if (sgnL ^ sgnR == True):
+                                cv2.rectangle(processedFrame, (bx, by), (bx + bw, by + bh), (220, 252, 255),
+                                              -1)  # (180, 237, 167)
+                                contours_out.append(j)
                 return img, is_stable, (intersectionX, intersectionY), (m_L[0], b_L[0]), (m_R[0], b_R[0]), contours_out
 
             else:
                 # print('Frame %s is ok, @Unstable state' % debug_count)
                 is_stable = False
-                return img, is_stable, (0, 0), (np.float32(0), np.float32(0)), (np.float32(0), np.float32(0)), contours_out
+                return img, is_stable, (0, 0), (np.float32(0), np.float32(0)), (
+                np.float32(0), np.float32(0)), contours_out
         except Exception as e:
             # print('Failed to process frame,' + '@Unstable state')
             is_stable = False
@@ -313,13 +335,11 @@ class Zebra(object):
             return img, is_stable, (0, 0), (np.float32(0), np.float32(0)), (np.float32(0), np.float32(0)), contours_out
 
 
-
-
 if __name__ == '__main__':
     # initialization
     # cap = cv2.VideoCapture('IMG_9033.m4v')  # load a video
     # cap = cv2.VideoCapture('IMG_9043.m4v')
-    cap = cv2.VideoCapture('IMG_9036.m4v')
+    cap = cv2.VideoCapture('./demo_video/Trim/medium/IMG_9043Trim.mp4')
     W = cap.get(3)  # get width
     H = cap.get(4)  # get height
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -339,7 +359,8 @@ if __name__ == '__main__':
         ret, frame = cap.read()
         img = scipy.misc.imresize(frame, (H, W))
 
-        img_processed, is_stable_test, zebra_end_point_test, line_left_test, line_right_test, zebra_contours_test = zebra_test.predict(img)
+        img_processed, is_stable_test, zebra_end_point_test, line_left_test, line_right_test, zebra_contours_test = zebra_test.predict(
+            img)
 
         # show & save
         img_out = cv2.imshow('Processed', img_processed)
