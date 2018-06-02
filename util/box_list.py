@@ -41,16 +41,24 @@ class BoxList(object):
       ValueError: if bbox data is not a numpy array
       ValueError: if invalid dimensions for bbox data
     """
+    self.shape = None
+
+    if isinstance(data, dict):
+      self.data = {
+        k: np.asarray(v) for k, v in data.items()
+      }
+      self.data['boxes'] = self.data['boxes'].reshape(-1, 4)
+    else:
+      self.data = {'boxes': np.array(data).reshape(-1, 4)}
+    data = self.data['boxes']
     if not isinstance(data, np.ndarray):
-      raise ValueError('data must be a numpy array.')
-    if len(data.shape) != 2 or data.shape[1] != 4:
-      raise ValueError('Invalid dimensions for box data.')
-    if data.dtype != np.float32 and data.dtype != np.float64:
-      raise ValueError('Invalid data type for box data: float is required.')
+      raise ValueError('data must be a numpy array, got %s instead.' % type(data))
+    if (len(data.shape) != 2 or data.shape[1] != 4) and (data.shape[0] != 0):
+      raise ValueError('Invalid dimensions for box data, except (?, 4) dimensions, got {0} instead.'.format(data.shape))
     if not self._is_valid_boxes(data):
       raise ValueError('Invalid box data. data must be a numpy array of '
                        'N*[y_min, x_min, y_max, x_max]')
-    self.data = {'boxes': data}
+
 
   def num_boxes(self):
     """Return number of boxes held in collections."""
@@ -74,6 +82,7 @@ class BoxList(object):
       ValueError: if the field is already exist or the dimension of the field
           data does not matches the number of boxes.
     """
+    field_data = np.asarray(field_data)
     if self.has_field(field):
       raise ValueError('Field ' + field + 'already exists')
     if len(field_data.shape) < 1 or field_data.shape[0] != self.num_boxes():
@@ -117,8 +126,26 @@ class BoxList(object):
     x_max = box_coordinates[:, 3]
     return [y_min, x_min, y_max, x_max]
 
-  def get_size_box(self):
+  def get_size_boxes(self):
     return two_point2point_size_array(self.get())
+
+  def get_specific_data(self, field, query):
+    keep = self.get_field(field) == query
+    new_data = {f: d[keep] for f, d in self.data.items()}
+    return BoxList(new_data)
+
+  def exclude_specific_data(self, field, query):
+    keep = self.get_field(field) != query
+    new_data = {f: d[keep] for f, d in self.data.items()}
+    return BoxList(new_data)
+
+  def keep_indices(self, idx):
+    for k, v in self.data.items():
+      self.data[k] = v[idx]
+
+  def get_ratio_boxes(self):
+    pass
+
 
   def _is_valid_boxes(self, data):
     """Check whether data fullfills the format of N*[ymin, xmin, ymax, xmin].
@@ -135,3 +162,7 @@ class BoxList(object):
         if data[i, 0] > data[i, 2] or data[i, 1] > data[i, 3]:
           return False
     return True
+
+  def __iter__(self):
+    for i in range(self.num_boxes()):
+      yield {k: v[i] for k, v in self.data.items()}

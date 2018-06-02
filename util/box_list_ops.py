@@ -21,8 +21,8 @@ Example box operations that are supported:
 """
 import numpy as np
 
-from utils import box_list
-from utils import box_ops
+from util import box_list
+from util import box_ops
 
 
 class SortOrder(object):
