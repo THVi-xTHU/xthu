@@ -140,7 +140,7 @@ class BlindNavigator(object):
         traffic_lights, detected_obstacles = self.detect_traffic_light(image)
         self.compute_distance_of_obstacles(image, detected_obstacles)
         
-        light_states = self.color_classify_by_boxes(image, traffic_lights.get())
+        light_states = self.color_classify_by_boxes(image, traffic_lights.get(), '210')
         light_types = self.estimate_pedestrain_light(image, traffic_lights.get())
         traffic_lights.add_field('states', light_states)
         traffic_lights.add_field('types', light_types)
