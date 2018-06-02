@@ -1,4 +1,5 @@
 obstacle_threshold=3
+nms_thresh = 0.5
 
 config = {}
 
@@ -15,8 +16,6 @@ config['LightPool'] = {
   'reliable_count': 5,
   'use_hog': True,
 }
-
-
 
 
 path = {

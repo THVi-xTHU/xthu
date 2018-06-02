@@ -4,6 +4,9 @@ from sklearn.utils.linear_assignment_ import linear_assignment
 from bbox_transform import bbox_overlaps
 from non_maximum_suppression import non_max_suppression_slow
 
+from util.box_list import BoxList
+from util.box_list_ops import *
+from hyperparams import *
 
 class LightTracker(object):
     def __init__(self, image, bbox, use_hog=False, conf_threshold=0.1, state_len = 10, state_threshold = 0.9):
@@ -112,7 +115,7 @@ class LightPool(object):
         self.reliable_count = reliable_count          # minimum count for a light treated as pedestrain light
         self.cur_max_times = 0                         # max times of a tracker determinated as pedestrain light 
         self.forward_max_times = 0                     # new max times
-        self.output_boxes = []
+        self.output_boxlist = None
         self.pedestrain_light = None
         
     def add_tracker(self, image, bbox):
@@ -128,36 +131,41 @@ class LightPool(object):
             self.forward_max_times = 0
             self.cur_max_times = 0
             self.pedestrain_light = None
-        return [ self.trackers[i] for i in keep_indices ]
+        return [ self.trackers[i] for i in keep_indices]
         
     def predict(self, image):
         est_boxes = []
-        valid_indexes = []
+        valid_indices = []
         for i, tracker in enumerate(self.trackers):
             bbox, pval = tracker.predict(image)
             est_boxes.append(bbox)
-            valid_indexes.append(pval)
+            valid_indices.append(pval)
         est_boxes = np.array(est_boxes).reshape(-1, 4)
-        return est_boxes, valid_indexes
+        tbox_list = BoxList(est_boxes)
+        tbox_list.add_field('valid_indices', valid_indices)
+        return tbox_list
 
-    def get_boxes(self, image, dboxes, scores):
+    def get_boxes(self, image, dbox_list):
         """
         output_boxes = [(id_in_pool, (x1, y1, x2, y2)), ...]
         """
         self.remove_tracker()
-        tboxes, valid_indexes = self.predict(image)
+        tbox_list = self.predict(image)
+
+        dboxes = dbox_list.get()
+        dscores = dbox_list.get_field('scores')
         
-        keep_dboxes_idx = non_max_suppression_slow(dboxes, scores, 0.5)
-        dboxes = dboxes[keep_dboxes_idx]
+        keep_dboxes_idx = non_max_suppression_slow(dboxes, dscores, nms_thresh)
+
+        dbox_list.keep_indices(keep_dboxes_idx)
         
-        overlaps = bbox_overlaps(tboxes, dboxes)
-#         all_scores = np.ones((dboxes.shape[0] + tboxes.shape[0],))
-#         all_scores[:dboxes.shape[0]] = scores[:] + 1
+        overlaps = iou(tbox_list, dbox_list)
         
         if np.prod(overlaps.shape) != 0:
             tscores = overlaps.max(axis=1)
-            keep_tboxes_idx = non_max_suppression_slow(tboxes, tscores, 0.5)
-            tboxes = tboxes[keep_tboxes_idx]
+            tbox_list.add_field('scores', tscores)
+            keep_tboxes_idx = non_max_suppression_slow(tbox_list.get(), tscores, nms_thresh)
+            tbox_list.keep_indices(keep_tboxes_idx)
             matched_indices = linear_assignment(-overlaps)
         else:
             matched_indices = np.array([])
@@ -174,35 +182,40 @@ class LightPool(object):
                 self.trackers[matched[0]].detected += 1
         
         # new detected traffic lights
-        for i in range(dboxes.shape[0]):
+        for i in range(dbox_list.num_boxes()):
             if matched_indices.shape[0] == 0 or i not in matched_indices[:, 1]:
                 merged_idx.append(self.count())
                 merged_boxes.append(dboxes[i, :])
                 d_or_t.append('d')
                 self.add_tracker(image, dboxes[i, :])
-        
+
+        tboxes = tbox_list.get()
+        valid_indices = tbox_list.get_field('valid_indices')
         # tracked but not detected traffic lights
-        for i in range(tboxes.shape[0]):
+        for i in range(tbox_list.num_boxes()):
             if matched_indices.shape[0] == 0 or i not in matched_indices[:, 0]:
-                if valid_indexes[i] >  self.conf_threshold:
+                if valid_indices[i] >  self.conf_threshold:
                     merged_idx.append(i)
                     merged_boxes.append(tboxes[i, :])
                     d_or_t.append('t')
                 self.trackers[i].detected -= 1
                 
         print(dboxes, tboxes, matched_indices, merged_boxes, d_or_t)
-        self.output_boxes = merged_boxes
-        self.boxes_idx = merged_idx
-        return merged_idx, merged_boxes
+        self.output_boxlist = BoxList({
+          'boxes': merged_boxes,
+          'index': merged_idx,
+          'd_or_t': d_or_t
+        })
+        return self.output_boxlist
     
     def set_types(self, types):
-        for id_, boxes, typ in zip(self.boxes_idx, self.output_boxes, types):
+        for id_, typ in zip(self.output_boxlist.get_field('index'), types):
             self.trackers[id_].add_type(typ)
             if self.trackers[id_].pc[1] > self.forward_max_times:
                 self.forward_max_times = self.trackers[id_].pc[1]
             
     def set_states(self, states):
-        for id_, boxes, state in zip(self.boxes_idx, self.output_boxes, states):
+        for id_, state in zip(self.output_boxlist.get_field('index'),  states):
             self.trackers[id_].add_state(state)
 
            

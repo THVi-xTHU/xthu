@@ -9,14 +9,14 @@ import numpy as np
 from color_classify import estimate_label
 from keras_yolo3.yolo import YOLO
 from tracker_pool import LightPool
-from fcrn_depth_prediction.depth import Depth
+# from fcrn_depth_prediction.depth import Depth
 
 from Zebra import Zebra
 from hyperparams import *
 
 class BlindNavigator(object):
     def __init__(self):
-        self.depth_estimator = Depth(path['FCRN'])
+        # self.depth_estimator = Depth(path['FCRN'])
         self.detector = YOLO(path['YOLO'], path['YOLO_anchor'], path['YOLO_classes'])
         self.zebra_detector = Zebra()
         
@@ -38,17 +38,14 @@ class BlindNavigator(object):
     
     def detect_traffic_light(self, image):
         # detected = [('cls', [array (1, 4) for box]), ...]
-        detected = self.detector.predict(image)
-        detected_traffic_lights = np.array([d[1] for d in detected if 'traffic light' in d[0]])
-        detected_traffic_lights_scores = np.array([d[2] for d in detected if 'traffic light' in d[0]])
-
-
-        detected_obstacles = [{'cls': d[0], 'box': d[1]} for d in detected if 'traffic light' not in d[0]]
-        light_idx, traffic_lights = self.traffic_light_pool.get_boxes(image, detected_traffic_lights, detected_traffic_lights_scores)
+        detected_boxlist = self.detector.predict(image)
+        detected_lights = detected_boxlist.get_specific_data('classes', 'traffic light')
+        detected_obstacles = detected_boxlist.exclude_specific_data('classes', 'traffic light')
+        traffic_lights = self.traffic_light_pool.get_boxes(image, detected_lights)
         print('Detected %d traffic lights, in total %d traffic lights, %d obstacles'%( \
-                len(detected_traffic_lights), len(traffic_lights), len(detected_obstacles)))
+                detected_lights.num_boxes(), traffic_lights.num_boxes(), detected_obstacles.num_boxes()))
 
-        return light_idx, traffic_lights, detected_obstacles 
+        return traffic_lights, detected_obstacles
     
     def color_classify_by_boxes(self, image, boxes, order='012'):
         labels = []
@@ -96,7 +93,7 @@ class BlindNavigator(object):
                 
                 
     def estimate_pedestrain_light(self, image, traffic_lights):
-        # traffic lights are loaded from traffic_lights_pool
+        # traffic lights are ndarray object
         # zebra_end_point: tuple (x, y), line: has k and b attribute
         if len(traffic_lights) == 0: return []
         _, self.is_stable, zebra_end_point, line_left, line_right, self.zebra_contours = self.zebra_detector.predict(image)
@@ -118,13 +115,15 @@ class BlindNavigator(object):
         #     'box': (xmin, ymin, xmax, ymax),
         #     'cls': "class",
         #    }
-        depth = self.depth_estimator.predict(image)
-        
-        for obs in obstacles:
-            xmin, ymin, xmax, ymax = obs['box']
-            cropped_depth = depth[ymin: ymax, xmin: xmax]
-            od = {'distance': np.median(cropped_depth.ravel())}
-            obs.update(od)
+        # depth = self.depth_estimator.predict(image)
+
+        od = []
+        for obs in obstacles.get():
+            xmin, ymin, xmax, ymax = obs
+            # cropped_depth = depth[ymin: ymax, xmin: xmax]
+            # od = {'distance': np.median(cropped_depth.ravel())}
+            od.append('10')
+        obstacles.add_field('distances', od)
             
     def arrive(self, image):
         if len(self.traffic_light_pool.trackers) == 0:
@@ -138,11 +137,11 @@ class BlindNavigator(object):
         return True
 
     def executor(self, image):
-        light_idx, traffic_lights, detected_obstacles = self.detect_traffic_light(image)
+        traffic_lights, detected_obstacles = self.detect_traffic_light(image)
         self.compute_distance_of_obstacles(image, detected_obstacles)
         
-        light_states = self.color_classify_by_boxes(image, traffic_lights)
-        light_types = self.estimate_pedestrain_light(image, traffic_lights)
+        light_states = self.color_classify_by_boxes(image, traffic_lights.get())
+        light_types = self.estimate_pedestrain_light(image, traffic_lights.get())
         self.traffic_light_pool.set_types(light_types)
         self.traffic_light_pool.set_states(light_states)
         self.traffic_light_pool.set_pedestrain_light()
@@ -174,7 +173,7 @@ class BlindNavigator(object):
             elif self.state == 'ARRIVE':
                 self.state = 'LIGHT_WAIT'
        
-        return plight, detected_obstacles, light_idx, traffic_lights, light_states
+        return plight, detected_obstacles, traffic_lights
     
 
 

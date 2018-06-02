@@ -126,27 +126,27 @@ def test_light_classifier():
         visor.drawer(data)
 
 def test_zebra_contours():
-    video_path = 'data/IMG_9033.m4v'
+    video_path = 'traffic light/IMG_9033.m4v'
     save_path = 'IMG_9033_zebra_track.avi'
 
     visor = Visor(debuger)
     visor.initializer()
     navigator = BlindNavigator()
     for data in read_video(video_path):
-        p_lights, detected_obstacles = navigator.executor(data)
+        p_light, detected_obstacles, traffic_lights = navigator.executor(data)
         data = visor.inliner(data, save_path)
-        if p_lights is not None:
-            for bbox, state in zip(p_lights.get_box(), p_lights.get_state()):
-
-                bbox = visor.rescale_box(bbox)
-                assert  id_ < len(navigator.traffic_light_pool.trackers), 'id_ not valid'
-                cv2.rectangle(data, tuple(bbox[:2]),tuple(bbox[2:4]), [255, 0, 0], 3)
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                cv2.putText(data, '%s'%(state), (bbox[0]-1,bbox[1]-1), font, 1, color=(255,255,0), thickness=2)
+        if p_light is not None:
+            bbox = p_light.get_bbox()
+            state = p_light.get_state()
+            bbox = visor.rescale_box(bbox)
+            # assert  id_ < len(navigator.traffic_light_pool.trackers), 'id_ not valid'
+            cv2.rectangle(data, tuple(bbox[:2]),tuple(bbox[2:4]), [255, 0, 0], 3)
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            cv2.putText(data, '%s'%(state), (bbox[0]-1,bbox[1]-1), font, 1, color=(255,255,0), thickness=2)
 
         for j in navigator.zebra_contours:
             bx, by, bw, bh = cv2.boundingRect(j)
-            cv2.rectangle(im, (bx, by), (bx + bw, by + bh), (180, 237, 167), -1)
+            cv2.rectangle(data, (bx, by), (bx + bw, by + bh), (180, 237, 167), -1)
         visor.drawer(data)
 
 
