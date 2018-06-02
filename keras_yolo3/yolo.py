@@ -23,7 +23,7 @@ except:
     from yolo3.model import yolo_eval
     from yolo3.utils import letterbox_image
 
-
+from util.box_list import BoxList
 
 import sys
 m = 'yolo'
@@ -115,8 +115,10 @@ class YOLO(object):
                 K.learning_phase(): 0
             })
 
-
-        detected_list = []
+        detected_bboxes = []
+        detected_cls = []
+        detected_scores = []
+        shape = [image.size[1], image.size[0]]
         for i, c in reversed(list(enumerate(out_classes))):
             predicted_class = self.class_names[c]
             box = out_boxes[i]
@@ -139,9 +141,17 @@ class YOLO(object):
 #                     cropped = np.array(image.crop((left, top, right, bottom)).getdata()).reshape(-1, right - left, 4)
 #                 color = classify(cropped, order='210')
 #                 predicted_class += ' ' + color
-            
-            detected_list.append((predicted_class, np.array([left, top, right, bottom])))
-        return detected_list
+
+            detected_bboxes.append([left, top, right, bottom])
+            detected_cls.append(predicted_class)
+            detected_scores.append(score)
+
+        detected_boxlist = BoxList(np.array(detected_bboxes))
+        detected_boxlist.add_field('classes', np.array(detected_cls))
+        detected_boxlist.add_field('scores', np.array(detected_scores))
+        detected_boxlist.shape = shape
+
+        return detected_boxlist
               
         
     def detect_image(self, image):
