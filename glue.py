@@ -115,14 +115,14 @@ class BlindNavigator(object):
         #     'box': (xmin, ymin, xmax, ymax),
         #     'cls': "class",
         #    }
-        # depth = self.depth_estimator.predict(image)
+        depth = self.depth_estimator.predict(image)
 
         od = []
         for obs in obstacles.get():
             xmin, ymin, xmax, ymax = obs
-            # cropped_depth = depth[ymin: ymax, xmin: xmax]
-            # od = {'distance': np.median(cropped_depth.ravel())}
-            od.append('10')
+            cropped_depth = depth[ymin: ymax, xmin: xmax]
+            od.append(np.median(cropped_depth.ravel()))
+            # od.append('10')
         obstacles.add_field('distances', od)
             
     def arrive(self, image):

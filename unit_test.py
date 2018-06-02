@@ -128,8 +128,8 @@ def test_light_classifier():
         visor.drawer(data)
 
 def test_zebra_contours():
-    video_path = 'traffic light/IMG_9033.m4v'
-    save_path = 'IMG_9033_zebra_track.avi'
+    video_path = 'Trim/trim.m4v'
+    save_path = 'IMG_trim_zebra_track.avi'
 
     visor = Visor(debuger)
     visor.initializer()
