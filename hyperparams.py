@@ -1,21 +1,19 @@
-obstacle_threshold=3
-nms_thresh = 0.5
+OBSTACLE_THRESHOLD = 3
+NMS_THRESHOLD = 0.5
+TCONF_THRESHOLD =  0.1
+STATE_THRESHOLD = 0.9
+TYPE_THRESHOLD = 0.8
+IOU_THRESHOLD = 0.5
 
-config = {}
+CONF_AVERAGE = 0.5
 
-config['LightTracker'] = {
-  'conf_threshold': 0.1,
-  'state_len': 10,
-  'state_threshold': 0.9,
-  'use_hog': False,
-}
+USE_HOG = False
 
-config['LightPool'] = {
-  'conf_threshold': 0.1, 
-  'iou_threshold': 0.5, 
-  'reliable_count': 5,
-  'use_hog': True,
-}
+RELIABLE_COUNT = 30
+
+STATE_LEN = 10
+TYPE_LEN = 100
+TYPE_WAIT_LEN = 30
 
 
 path = {

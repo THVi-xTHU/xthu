@@ -19,8 +19,8 @@ class Visualizer(object):
     self.colors = colors
 
   def depth_to_rgba(self, depth):
-    _min = np.min(depth)
-    _max = np.max(depth)
+    _min = 0
+    _max = 100
     
 #     import pdb
 #     pdb.set_trace()

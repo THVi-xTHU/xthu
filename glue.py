@@ -131,8 +131,9 @@ class BlindNavigator(object):
         return False
     
     def _has_obstacle(self, obstacles, thresh=1):
-        closet_obs_depth = min(obstacles, key=lambda x: x['distance'])
-        if closet_obs_depth['distance'] < thresh:
+        dist = obstacles.get_field('distances')
+        closet_obs_depth = min(dist)
+        if closet_obs_depth < thresh:
             return False
         return True
 
@@ -140,7 +141,7 @@ class BlindNavigator(object):
         traffic_lights, detected_obstacles = self.detect_traffic_light(image)
         self.compute_distance_of_obstacles(image, detected_obstacles)
         
-        light_states = self.color_classify_by_boxes(image, traffic_lights.get())
+        light_states = self.color_classify_by_boxes(image, traffic_lights.get(), '210')
         light_types = self.estimate_pedestrain_light(image, traffic_lights.get())
         traffic_lights.add_field('states', light_states)
         traffic_lights.add_field('types', light_types)
@@ -158,15 +159,15 @@ class BlindNavigator(object):
             elif self.state == 'START_FORWARD':
                 if plight.get_state() == 'R':
                     self.state = 'LIGHT_WAIT'
-                if self._has_obstacle(detected_obstacles, obstacle_threshold):
+                if self._has_obstacle(detected_obstacles, OBSTACLE_THRESHOLD):
                     self.state = 'CROSS_WAIT'
             elif self.state == 'CROSS_WAIT':
-                if not self._has_obstacle(detected_obstacles, obstacle_threshold):
+                if not self._has_obstacle(detected_obstacles, OBSTACLE_THRESHOLD):
                     self.state = 'CROSS_FORWARD'
                 if plight.get_state() == 'R':
                     self.alert = 'CROSS_RED'
             elif self.state == 'CROSS_FORWARD':
-                if self._has_obstacle(detected_obstacles, obstacle_threshold):
+                if self._has_obstacle(detected_obstacles, OBSTACLE_THRESHOLD):
                     self.state = 'CROSS_WAIT' 
                 if plight.get_state() == 'R':
                     self.alert = 'CROSS_RED'
