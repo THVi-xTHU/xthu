@@ -5,6 +5,8 @@ import numpy as np
 import cv2
 import time
 
+from visualization import Visualizer
+
 debuger = 'OFFLINE'
 if debuger == 'ONLINE':
     import matplotlib.pyplot as plt
@@ -132,6 +134,7 @@ def test_zebra_contours():
     visor = Visor(debuger)
     visor.initializer()
     navigator = BlindNavigator()
+    vis = Visualizer()
     for data in read_video(video_path):
         p_light, detected_obstacles, traffic_lights = navigator.executor(data)
         data = visor.inliner(data, save_path)
@@ -147,6 +150,12 @@ def test_zebra_contours():
         for j in navigator.zebra_contours:
             bx, by, bw, bh = cv2.boundingRect(j)
             cv2.rectangle(data, (bx, by), (bx + bw, by + bh), (180, 237, 167), -1)
+        data = vis.plot(data,
+                        detected_obstacles.get_field('classes'),
+                        detected_obstacles.get(),
+                        detected_obstacles.get_field('distances'),
+                        traffic_lights,
+                        False, navigator.zebra_contours)
         visor.drawer(data)
 
 

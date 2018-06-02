@@ -9,14 +9,14 @@ import numpy as np
 from color_classify import estimate_label
 from keras_yolo3.yolo import YOLO
 from tracker_pool import LightPool
-# from fcrn_depth_prediction.depth import Depth
+from fcrn_depth_prediction.depth import Depth
 
 from Zebra import Zebra
 from hyperparams import *
 
 class BlindNavigator(object):
     def __init__(self):
-        # self.depth_estimator = Depth(path['FCRN'])
+        self.depth_estimator = Depth(path['FCRN'])
         self.detector = YOLO(path['YOLO'], path['YOLO_anchor'], path['YOLO_classes'])
         self.zebra_detector = Zebra()
         
@@ -142,6 +142,9 @@ class BlindNavigator(object):
         
         light_states = self.color_classify_by_boxes(image, traffic_lights.get())
         light_types = self.estimate_pedestrain_light(image, traffic_lights.get())
+        traffic_lights.add_field('states', light_states)
+        traffic_lights.add_field('types', light_types)
+
         self.traffic_light_pool.set_types(light_types)
         self.traffic_light_pool.set_states(light_states)
         self.traffic_light_pool.set_pedestrain_light()

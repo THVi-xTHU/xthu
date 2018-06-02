@@ -1,7 +1,6 @@
 from KCF.kcftracker import KCFTracker
 from utility import *
 from sklearn.utils.linear_assignment_ import linear_assignment
-from bbox_transform import bbox_overlaps
 from non_maximum_suppression import non_max_suppression_slow
 
 from util.box_list import BoxList
