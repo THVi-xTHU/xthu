@@ -1,21 +1,17 @@
-obstacle_threshold=3
-nms_thresh = 0.5
+import numpy as np
+from PIL import ImageFont
 
-config = {}
+OBSTACLE_THRESHOLD = 3
+NMS_TRHESHOLD = 0.5
 
-config['LightTracker'] = {
-  'conf_threshold': 0.1,
-  'state_len': 10,
-  'state_threshold': 0.9,
-  'use_hog': False,
-}
 
-config['LightPool'] = {
-  'conf_threshold': 0.1, 
-  'iou_threshold': 0.5, 
-  'reliable_count': 5,
-  'use_hog': True,
-}
+TCONF_THREHSOLD =  0.1,
+STATE_LEN = 10,
+STATE_THRESHOLD = 0.9,
+USE_HOG = False,
+
+IOU_THRESHOLD = 0.5,
+RELIABLE_COUNT = 5,
 
 
 path = {
@@ -24,4 +20,9 @@ path = {
   'YOLO_anchor': 'keras_yolo3/model_data/yolo_anchors.txt',
   'YOLO_classes': 'keras_yolo3/model_data/yolo.names',
 }
-    
+
+efont = ImageFont.truetype(font='keras_yolo3/font/FiraMono-Medium.otf',
+                     size=np.floor(3e-2 * 640 + 0.5).astype('int32'))
+cfont = ImageFont.truetype(font='MS.ttf',
+                     size=np.floor(3e-2 * 640 + 0.5).astype('int32'))
+thickness = 3
