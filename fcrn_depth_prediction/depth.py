@@ -3,7 +3,7 @@ import tensorflow as tf
 from PIL import Image
 from . import models
 import cv2
-
+from hyperparams import *
 class Depth(object):
     def __init__(self, model_path):
         self.input_height = 228
@@ -41,11 +41,9 @@ class Depth(object):
         img = np.expand_dims(np.asarray(img), axis = 0)
         pred = self.sess.run(self.net.get_output(), feed_dict={self.input_node: img})
         print(pred.shape)
-        depth = pred[0, :, :, 0] * self.scale
+        depth = pred[0, :, :, 0] * EXPAND
        
-        depth = cv2.resize(depth, (image.size[1], image.size[0]), interpolation=cv2.INTER_LINEAR)
+        depth = cv2.resize(depth, (image.size[0], image.size[1]), interpolation=cv2.INTER_LINEAR)
         print(depth.shape)
         return depth
 
-    def __del__(self):
-        self.sess.close()

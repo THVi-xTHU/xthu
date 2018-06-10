@@ -3,7 +3,7 @@
 """
 Run a YOLO_v3 style detection model on test images.
 """
-
+import tensorflow as tf
 import colorsys
 import os
 import random
@@ -30,8 +30,7 @@ from util.box_list import BoxList
 import sys
 m = 'yolo'
 
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '1 '
+
 
 def classify(cropped_img, order='012'):
     order = [int(o) for o in order]

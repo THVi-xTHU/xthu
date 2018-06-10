@@ -207,6 +207,7 @@ class LightPool(object):
         dbox_list.keep_indices(sorted(keep_dboxes_idx))
 
         overlaps = iou(tbox_list, dbox_list)
+        dboxes = dbox_list.get()
         print(dboxes, '\n', tbox_list.get(), overlaps)
 
         if np.prod(overlaps.shape) != 0:

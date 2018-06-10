@@ -56,9 +56,15 @@ class BlindNavigator(object):
     
     def color_classify_by_boxes(self, image, boxes, order='012'):
         labels = []
+        h, w = image.shape[:2]
+        boxes[:, :3:2] = np.maximum(np.minimum(boxes[:, :3:2], w), 0)
+        boxes[:, 1:4:2] = np.maximum(np.minimum(boxes[:, 1:4:2], h), 0)
         for box in boxes:
             box = box.astype(int)
+            
             cropped_image = image[box[1]:box[3], box[0]:box[2], :]
+            print('cropped box: ', box)
+            print('cropped img: ', cropped_image)
             labels.append(self.color_classify_by_patch(cropped_image, order))
         return labels
     
@@ -123,7 +129,6 @@ class BlindNavigator(object):
         #     'cls': "class",
         #    }
         depth = self.depth_estimator.predict(image)
-
         od = []
         for obs in obstacles.get():
             xmin, ymin, xmax, ymax = obs
