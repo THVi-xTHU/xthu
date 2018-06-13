@@ -78,7 +78,7 @@ class Zebra(object):
         self.draw_b_R_list = deque(maxlen=draw_qlen)
 
     # process a frame
-    def process(self, im):
+    def process(self, im, road_mask=None):
 
         # initialize some variables
         H, W = im.shape[:2]
@@ -115,10 +115,12 @@ class Zebra(object):
         # cv2.drawContours(im, contours, -1, (0, 0, 255), 3)
         # cv2.imshow("img", im)
         # cv2.waitKey(0)
-
+        
+        
         for i in contours:
             bx, by, bw, bh = cv2.boundingRect(i)
-
+            if sum(road_mask[bx:bx+bw, by:by+bh]) / (bw * bh) < 0.5:
+                continue
             if (bw > bw_width):
                 # cv2.line(im,(bx,by),(bx+bw,by),(0,255,0),2) # draw the a contour line
                 # Tianyi
@@ -228,7 +230,7 @@ class Zebra(object):
 
         return im, m_L, b_L, m_R, b_R, contours, int(intersectionX), int(intersectionY)
 
-    def predict(self, img):
+    def predict(self, img, road_mask=None):
         # i = 0
         # state = ""
         is_stable = False
@@ -243,7 +245,7 @@ class Zebra(object):
 
         try:
             # processedFrame,dx,dy = process(img)
-            processedFrame, m_L, b_L, m_R, b_R, contours, intersectionX, intersectionY = self.process(img)
+            processedFrame, m_L, b_L, m_R, b_R, contours, intersectionX, intersectionY = self.process(img, road_mask)
 
             # Update list
             self.m_L_list.append(m_L)

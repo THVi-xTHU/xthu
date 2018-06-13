@@ -91,8 +91,13 @@ class YOLO(object):
                 len(self.class_names), self.input_image_shape,
                 score_threshold=self.score, iou_threshold=self.iou)
         return boxes, scores, classes
-
+    
     def predict(self, image):
+      with self.sess.as_default():
+        with self.sess.graph.as_default():
+          return self._predict(image)
+    
+    def _predict(self, image):
         image = Image.fromarray(image)
 
         if self.is_fixed_size:

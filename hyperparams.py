@@ -29,6 +29,10 @@ path = {
   'YOLO': 'keras_yolo3/model_data/yolo.h5',
   'YOLO_anchor': 'keras_yolo3/model_data/yolo_anchors.txt',
   'YOLO_classes': 'keras_yolo3/model_data/yolo.names',
+  'KITTI_MODEL': 'KittiSeg_pretrained',
+  'KITTI_RUNS': 'KittiSeg/RUNS',
+  'KITTI_HYPES': 'hypes',
+  'KITTI_DATA_DIR': 'KittiSeg/DATA'
 }
 
 efont = ImageFont.truetype(font='keras_yolo3/font/FiraMono-Medium.otf',

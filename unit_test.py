@@ -147,7 +147,7 @@ def batch_test_zebra_contours(video_path_list):
       if not video_path.endswith('.mp4'):
         continue
   
-      save_path = video_path.split('.')[0] + '_processed.avi'
+      save_path = video_path.split('.')[0] + '_processed.mp4'
       if os.path.exists(save_path):
           continue
       print('Input: %s, Output:%s'%(video_path, save_path))
@@ -158,7 +158,7 @@ def batch_test_zebra_contours(video_path_list):
         print(data.shape)
         #         import pdb
         #         pdb.set_trace()
-        p_light, detected_obstacles, traffic_lights = navigator.executor(data)
+        p_light, detected_obstacles, traffic_lights, road_mask = navigator.executor(data)
         data = visor.inliner(data, save_path)
     #     traffic_lights = []
 
@@ -169,6 +169,13 @@ def batch_test_zebra_contours(video_path_list):
 
           [bx, by, bw, bh] = visor.rescale_box([bx, by, bw, bh])
           cv2.rectangle(data, (bx, by), (bx + bw, by + bh), (220, 252, 255), -1)
+        #plt.figure()
+        #ax = plt.gca()
+        #ax.imshow(road_mask.astype(np.uint8)) 
+#       plt.show()
+        #plt.savefig('test.png')
+        #import pdb
+        #pdb.set_trace()
 
 
         depth = navigator.depth_estimator.predict(data)
@@ -239,7 +246,7 @@ def test_zebra_contours(video_path, save_path):
     print(data.shape)
     #         import pdb
     #         pdb.set_trace()
-    p_light, detected_obstacles, traffic_lights = navigator.executor(data)
+    p_light, detected_obstacles, traffic_lights, road_mask = navigator.executor(data)
     data = visor.inliner(data, save_path)
 #     traffic_lights = []
 
@@ -251,9 +258,13 @@ def test_zebra_contours(video_path, save_path):
       [bx, by, bw, bh] = visor.rescale_box([bx, by, bw, bh])
       cv2.rectangle(data, (bx, by), (bx + bw, by + bh), (220, 252, 255), -1)
     
-    
-
-
+    plt.figure()
+    ax = plt.gca()
+    ax.imshow(road_mask.astype(np.uint8)) 
+#         plt.show()
+    plt.savefig('test.png')
+    import pdb
+    pdb.set_trace()
     depth = navigator.depth_estimator.predict(data)
     
     obs_cls = detected_obstacles.get_field('classes')

@@ -21,16 +21,21 @@ class Depth(object):
     def load_model(self):
 
          # Create a placeholder for the input image
+        print(tf.get_default_graph())
 
-        self.input_node = tf.placeholder(tf.float32, shape=(None, self.input_height, self.input_width, self.input_channels))
-        # Construct the network
+        g=tf.Graph()
+        print("g:",g)
+        with g.as_default():
+ 
+            self.input_node = tf.placeholder(tf.float32, shape=(None, self.input_height, self.input_width, self.input_channels))
+            # Construct the network
 
-        self.net = models.ResNet50UpProj({'data': self.input_node}, self.batch_size, 1, False)
-        self.saver = tf.train.Saver()   
+            self.net = models.ResNet50UpProj({'data': self.input_node}, self.batch_size, 1, False)
+            self.saver = tf.train.Saver()   
         
-        self.sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
+            self.sess = tf.Session(config=tf.ConfigProto(log_device_placement=True))
 
-        self.saver.restore(self.sess, self.model_path)
+            self.saver.restore(self.sess, self.model_path)
         
     def predict(self, img):
         image = Image.fromarray(img, 'RGB')
