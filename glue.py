@@ -64,7 +64,6 @@ class BlindNavigator(object):
             
             cropped_image = image[box[1]:box[3], box[0]:box[2], :]
             print('cropped box: ', box)
-            print('cropped img: ', cropped_image)
             labels.append(self.color_classify_by_patch(cropped_image, order))
         return labels
     
@@ -110,6 +109,7 @@ class BlindNavigator(object):
         # zebra_end_point: tuple (x, y), line: has k and b attribute
         if len(traffic_lights) == 0: return []
         _, self.is_stable, zebra_end_point, line_left, line_right, self.zebra_contours = self.zebra_detector.predict(image, mask)
+        print('Is Stable: ', self.is_stable)
         
         if not self.is_stable:
             return [2] * len(traffic_lights)
@@ -135,8 +135,6 @@ class BlindNavigator(object):
             cropped_depth = depth[ymin: ymax, xmin: xmax]
             od.append(np.median(cropped_depth.ravel()))
             # od.append('10')
-        print('add distances: ', od)
-        print('depth: ', depth)
         obstacles.add_field('distances', od)
             
     def arrive(self, image):
@@ -169,7 +167,7 @@ class BlindNavigator(object):
         traffic_lights.add_field('types', light_types)
 
         self.traffic_light_pool.set_types(light_types)
-        self.traffic_light_pool.set_states(light_states)
+        valid = self.traffic_light_pool.set_states(light_states)
         self.traffic_light_pool.set_pedestrain_light()
         plight = self.traffic_light_pool.get_pedestrain_light()
         if plight:
@@ -177,28 +175,38 @@ class BlindNavigator(object):
             if self.state == 'LIGHT_WAIT':
                 if plight.get_state() == 'G':
                     self.state = 'START_FORWARD'
+                    print('[%s] Pedestrain Light Turn Green, Start Walking.'%self.state)
                     self.alert = None
             elif self.state == 'START_FORWARD':
                 if plight.get_state() == 'R':
                     self.state = 'LIGHT_WAIT'
+                    print('[%s] Pedestrain Light Turn Red, Start Waiting.'%self.state)
                 if self._has_obstacle(detected_obstacles, OBSTACLE_THRESHOLD):
                     self.state = 'CROSS_WAIT'
+                    print('[%s] Obstacle Nearby, Start Waiting.'%self.state)
             elif self.state == 'CROSS_WAIT':
                 if not self._has_obstacle(detected_obstacles, OBSTACLE_THRESHOLD):
                     self.state = 'CROSS_FORWARD'
+                    print('[%s] Obstacle Left, Start Walking.'%(self.state))
                 if plight.get_state() == 'R':
                     self.alert = 'CROSS_RED'
+                    print('[%s] Pedestrain Light Turn Red, Start Waiting.'%self.state)
             elif self.state == 'CROSS_FORWARD':
                 if self._has_obstacle(detected_obstacles, OBSTACLE_THRESHOLD):
                     self.state = 'CROSS_WAIT' 
+                    print('[%s] Obstacle Nearby, Start Waiting.' %self.state)
                 if plight.get_state() == 'R':
                     self.alert = 'CROSS_RED'
+                    print('[%s] Pedestrain Light Turn Red, Hurry up' %self.state)
                 if self.arrive(image):
                     self.alert = None
                     self.state = 'ARRIVE'
+                    print('[%s] Walking to destination.' %self.state)
             elif self.state == 'ARRIVE':
                 self.state = 'LIGHT_WAIT'
-       
+                print('[%s] Arrive'%self.state)
+        print('Original:', traffic_lights.num_boxes(), 'Left: ', valid)
+        traffic_lights.keep_indices(valid) 
         return plight, detected_obstacles, traffic_lights, rb_image
     
 

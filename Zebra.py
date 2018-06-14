@@ -119,7 +119,7 @@ class Zebra(object):
         
         for i in contours:
             bx, by, bw, bh = cv2.boundingRect(i)
-            if sum(road_mask[bx:bx+bw, by:by+bh]) / (bw * bh) < 0.5:
+            if road_mask and sum(road_mask[bx:bx+bw, by:by+bh]) / (bw * bh) < 0.5:
                 continue
             if (bw > bw_width):
                 # cv2.line(im,(bx,by),(bx+bw,by),(0,255,0),2) # draw the a contour line

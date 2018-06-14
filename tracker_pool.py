@@ -21,9 +21,11 @@ class LightTracker(object):
         self.type = 0 
         self.state = 'B'
         self.verified = False
+        self.ever_colored = 0
         self._hit = 1
         self._chit = 1
         self._detected = 1
+        self._age = 1
         self.confidence = 0.     # The confidence of light being a pedestrain light
         
     @property
@@ -34,8 +36,6 @@ class LightTracker(object):
     def hit(self, val):
         if self._hit < TYPE_LEN:
             self._hit = val
-
-             
     @property
     def chit(self):
         return self._chit
@@ -101,8 +101,14 @@ class LightTracker(object):
         return point_size2two_point(self.bbox)
     
     def add_state(self, state):
+        self._age += 1
         self.state_hist.append(state)
         print(self.state_hist)
+        if state != 'B':
+            self.ever_colored += 1
+        #if len(self.state_hist) >= STATE_LEN:
+        #    if self.state_hist[0] != 'B':
+        #        self.ever_colored -= 1
         self.state_hist = self.state_hist[- STATE_LEN:]
         print(self.state_hist)
 
@@ -110,16 +116,20 @@ class LightTracker(object):
         green = sum([ 1 for state in self.state_hist if state == 'G'])
         red = sum([ 1 for state in self.state_hist if state == 'R'])
         black = sum([ 1 for state in self.state_hist if state == 'B'])
-
-        if green > STATE_THRESHOLD * ( red + green ):
+        if green > STATE_THRESHOLD * ( red + green ) and green >= GREEN_THRESHOLD:
             self.state = 'G'
-        elif red > green and red > black:
+        elif red > green and red > black and red >= RED_THRESHOLD:
             self.state = 'R'
         else:
             self.state = 'B'
-        print('G: ', green, ', R: ', red, ', B: ', black, ', State_HIST: ', self.state_hist, self.state)
+        print('G: ', green, ', R: ', red, ', B: ', black, ', State_HIST: ', self.state_hist, self.state, 'ever_colored', self.ever_colored, 'box', self.bbox)
         
-        
+
+    def check_false_alarm(self):
+        if self.ever_colored / self._age >= EVER_COLORED_THRESHOLD:
+            return False
+        return True
+ 
     def add_type(self, typ):
         if typ != 2:
             self.type_hist.append(typ)
@@ -162,6 +172,9 @@ class LightPool(object):
     
     def remove_tracker(self):
         keep_indices = [i for i, tracker in enumerate(self.trackers) if tracker.hit >= -1 and tracker.detected >= -10 ]
+        for i, tracker in enumerate(self.trackers):
+            if i not in keep_indices:
+                print('Removed tracker: ', tracker.get_bbox(), ', hit: %d, detected: %d'%(tracker.hit, tracker.detected))
         if self.forward_max_times > TYPE_WAIT_LEN * TYPE_THRESHOLD and 0 not in keep_indices and len(self.trackers) > 0:        
             print('Remove current tracker, the tracker has hit %d, detected %d'%(
                 self.trackers[0].hit, self.trackers[0].detected))
@@ -191,7 +204,6 @@ class LightPool(object):
         tbox_list = BoxList(est_boxes)
         tbox_list.add_field('valid_indices', valid_indices)
         return tbox_list
-
     def get_boxes(self, image, dbox_list):
         """
         output_boxes = [(id_in_pool, (x1, y1, x2, y2)), ...]
@@ -215,8 +227,9 @@ class LightPool(object):
 
             tbox_list.add_field('scores', tscores)
             keep_tboxes_idx = non_max_suppression_slow(tbox_list.get(), tscores, NMS_THRESHOLD)
+            keep_tboxes_idx = sorted(keep_tboxes_idx)
 
-            tbox_list.keep_indices(sorted(keep_tboxes_idx))
+            tbox_list.keep_indices(keep_tboxes_idx)
             overlaps = iou(tbox_list, dbox_list)
             matched_indices = linear_assignment(-overlaps)
         else:
@@ -228,12 +241,12 @@ class LightPool(object):
         keep_indices = []
         for i, matched in enumerate(matched_indices):
             if overlaps[matched[0], matched[1]] > IOU_THRESHOLD:
-                merged_idx.append(matched[0])
+                merged_idx.append(keep_tboxes_idx[matched[0]])
                 merged_boxes.append(dboxes[matched[1], :])
                 d_or_t.append('d&t')
-                self.trackers[matched[0]].rectify(dboxes[matched[1], :])
-                self.trackers[matched[0]].detected += 1
-                self.trackers[matched[0]].chit += 1
+                self.trackers[keep_tboxes_idx[matched[0]]].rectify(dboxes[matched[1], :])
+                self.trackers[keep_tboxes_idx[matched[0]]].detected += 1
+                self.trackers[keep_tboxes_idx[matched[0]]].chit += 1
                 keep_indices.append(i)
         
         matched_indices = matched_indices[keep_indices]
@@ -254,12 +267,12 @@ class LightPool(object):
         # tracked but not detected traffic lights
         for i in range(tbox_list.num_boxes()):
             if matched_indices.shape[0] == 0 or i not in matched_indices[:, 0]:
-                if self.trackers[i].verified and valid_indices[i] >  TCONF_THRESHOLD:
-                    merged_idx.append(i)
+                if self.trackers[keep_tboxes_idx[i]].verified and valid_indices[i] >  TCONF_THRESHOLD:
+                    merged_idx.append(keep_tboxes_idx[i])
                     merged_boxes.append(tboxes[i, :])
                     d_or_t.append('t')
-                self.trackers[i].detected -= 1
-                self.trackers[i].chit = 0
+                self.trackers[keep_tboxes_idx[i]].detected -= 1
+                self.trackers[keep_tboxes_idx[i]].chit = 0
 
                 
         print(dboxes, tboxes, matched_indices, merged_boxes, d_or_t)
@@ -277,9 +290,14 @@ class LightPool(object):
                 self.forward_max_times = self.trackers[id_].pc[1]
             
     def set_states(self, states):
-        for id_, state in zip(self.output_boxlist.get_field('index'),  states):
+        valid = []
+        print(self.output_boxlist.get_field('index'))
+        for i, (id_, state) in enumerate(zip(self.output_boxlist.get_field('index'),  states)):
             self.trackers[id_].add_state(state)
-
+            if not self.trackers[id_].check_false_alarm():
+                valid.append(i) 
+        print(valid)
+        return valid
            
     def set_pedestrain_light(self):
         """

@@ -140,8 +140,14 @@ class BoxList(object):
     return BoxList(new_data)
 
   def keep_indices(self, idx):
+    
     for k, v in self.data.items():
-      self.data[k] = v[idx]
+      try:
+        self.data[k] = v[idx]
+      except:
+        import pdb
+        pdb.set_trace()
+   
 
   def get_ratio_boxes(self):
     pass

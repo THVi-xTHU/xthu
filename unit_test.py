@@ -130,8 +130,6 @@ def test_light_classifier(video_path, save_path):
         visor.drawer(data)
 
 def batch_test_zebra_contours(video_path_list):
-  visor = Visor(debuger)
-  visor.initializer()
   navigator = BlindNavigator()
   visualizer = Visualizer()
     
@@ -147,7 +145,9 @@ def batch_test_zebra_contours(video_path_list):
       if not video_path.endswith('.mp4'):
         continue
   
-      save_path = video_path.split('.')[0] + '_processed.mp4'
+      visor = Visor(debuger)
+      visor.initializer()
+      save_path = video_path.split('.')[0] + '_processed.avi'
       if os.path.exists(save_path):
           continue
       print('Input: %s, Output:%s'%(video_path, save_path))
@@ -172,7 +172,7 @@ def batch_test_zebra_contours(video_path_list):
         #plt.figure()
         #ax = plt.gca()
         #ax.imshow(road_mask.astype(np.uint8)) 
-#       plt.show()
+#       lt.show()
         #plt.savefig('test.png')
         #import pdb
         #pdb.set_trace()
@@ -223,6 +223,7 @@ def batch_test_zebra_contours(video_path_list):
 
         data = cv2.cvtColor(np.array(pil_im), cv2.COLOR_RGB2BGR)
 
+        #cv2.imwrite('debug_image/image-%d.png'%iiii, data)
         visor.drawer(data)
     
 def test_zebra_contours(video_path, save_path):
