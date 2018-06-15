@@ -27,9 +27,11 @@ def read_video(filename):
     i = 0
     while(cap.isOpened()):
         ret, frame = cap.read()
+        if ret==False or frame is None:
+            break
         print('get frame %d'%i)
         yield frame
         i+=1
-
+    
     cap.release()
-
+    raise StopIteration

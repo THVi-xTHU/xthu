@@ -65,22 +65,22 @@ def red_green_yellow(rgb_image):
   avg_saturation = sum_saturation / area # Find the average
 
   sat_low = int(avg_saturation * 1.3)
-  val_low = 140
+  val_low = {'R': 60, 'G': 140, 'Y': 140}
 
   # Green
-  lower_green = np.array([70,sat_low,val_low])
+  lower_green = np.array([70,sat_low,val_low['G']])
   upper_green = np.array([100,255,255])
   green_mask = cv2.inRange(hsv, lower_green, upper_green)
   green_result = cv2.bitwise_and(rgb_image, rgb_image, mask = green_mask)
 
   # Yellow
-  lower_yellow = np.array([10,sat_low,val_low])
+  lower_yellow = np.array([10,sat_low,val_low['Y']])
   upper_yellow = np.array([60,255,255])
   yellow_mask = cv2.inRange(hsv, lower_yellow, upper_yellow)
   yellow_result = cv2.bitwise_and(rgb_image, rgb_image, mask = yellow_mask)
 
   # Red
-  lower_red = np.array([150,sat_low,val_low])
+  lower_red = np.array([140,sat_low,val_low['R']])
   upper_red = np.array([180,255,255])
   red_mask = cv2.inRange(hsv, lower_red, upper_red)
   red_result = cv2.bitwise_and(rgb_image, rgb_image, mask = red_mask)
@@ -90,6 +90,8 @@ def red_green_yellow(rgb_image):
   sum_red = findNonZero(red_result)
 
   sums = [sum_red, sum_yellow, sum_green]
-  if max(sums) <  0.005 * area:
+  ratio = np.array(sums) / area
+  print('sums: ', sums, ' area: ', area, ' ratio: ', ratio)
+  if max(sums) <  0.001 * area:
      return 'B'
-  return ('R', 'B', 'G')[np.argmax(sums)]
+  return ('R', 'R', 'G')[np.argmax(sums)]

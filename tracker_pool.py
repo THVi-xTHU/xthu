@@ -24,6 +24,7 @@ class LightTracker(object):
         self.ever_colored = 0
         self._hit = 1
         self._chit = 1
+        self._cmiss = 0
         self._detected = 1
         self._age = 1
         self.confidence = 0.     # The confidence of light being a pedestrain light
@@ -34,7 +35,7 @@ class LightTracker(object):
     
     @hit.setter
     def hit(self, val):
-        if self._hit < TYPE_LEN:
+        if val < TYPE_LEN:
             self._hit = val
     @property
     def chit(self):
@@ -42,10 +43,18 @@ class LightTracker(object):
     
     @chit.setter
     def chit(self, val):
-        if self._chit < TYPE_LEN:
+        if val < TYPE_LEN:
             self._chit = val
-        if self._chit >= MIN_DET_COUNT:
+        if val >= MIN_DET_COUNT:
             self.verified = True
+    @property
+    def cmiss(self):
+        return self._cmiss
+    
+    @cmiss.setter
+    def cmiss(self, val):
+        if val < MISS_LEN:
+            self._cmiss = val
             
     @property
     def detected(self):
@@ -53,14 +62,12 @@ class LightTracker(object):
     
     @detected.setter
     def detected(self, val):
-        if self._detected < TYPE_LEN:
+        if val < TYPE_LEN:
             self._detected = val
 
     def predict(self, image):
         pbox, peak_value = self.tracker.predict(image)
-        if peak_value < TCONF_THRESHOLD:
-            self.hit -= 1
-        else:
+        if peak_value >= TCONF_THRESHOLD:
             self.bbox = pbox
         return point_size2two_point(pbox), peak_value
 
@@ -162,6 +169,7 @@ class LightPool(object):
         self.forward_max_times = 0                     # new max times
         self.output_boxlist = None
         self.pedestrain_light = None
+        self.history = 0
         
     def add_tracker(self, image, bbox):
         new_tracker = LightTracker(image, bbox)
@@ -171,7 +179,7 @@ class LightPool(object):
         return len(self.trackers)
     
     def remove_tracker(self):
-        keep_indices = [i for i, tracker in enumerate(self.trackers) if tracker.hit >= -1 and tracker.detected >= -10 ]
+        keep_indices = [i for i, tracker in enumerate(self.trackers) if tracker.hit >= MIN_HIT_THRESHOLD and tracker.detected >= MIN_DET_COUNT and tracker.cmiss >= MAX_MISS_THRESHOLD]
         for i, tracker in enumerate(self.trackers):
             if i not in keep_indices:
                 print('Removed tracker: ', tracker.get_bbox(), ', hit: %d, detected: %d'%(tracker.hit, tracker.detected))
@@ -208,6 +216,7 @@ class LightPool(object):
         """
         output_boxes = [(id_in_pool, (x1, y1, x2, y2)), ...]
         """
+        self.history += 1
         self.remove_tracker()
         tbox_list = self.predict(image)
 
@@ -234,6 +243,11 @@ class LightPool(object):
             matched_indices = linear_assignment(-overlaps)
         else:
             matched_indices = np.array([])
+            if overlaps.shape[0] == 0:
+                keep_tboxes_idx = []
+            else:
+                keep_tboxes_idx = list(range(tbox_list.num_boxes()))
+                
         
         merged_boxes = []
         merged_idx = []
@@ -247,6 +261,7 @@ class LightPool(object):
                 self.trackers[keep_tboxes_idx[matched[0]]].rectify(dboxes[matched[1], :])
                 self.trackers[keep_tboxes_idx[matched[0]]].detected += 1
                 self.trackers[keep_tboxes_idx[matched[0]]].chit += 1
+                self.trackers[keep_tboxes_idx[matched[0]]].cmiss = 0
                 keep_indices.append(i)
         
         matched_indices = matched_indices[keep_indices]
@@ -271,10 +286,14 @@ class LightPool(object):
                     merged_idx.append(keep_tboxes_idx[i])
                     merged_boxes.append(tboxes[i, :])
                     d_or_t.append('t')
-                self.trackers[keep_tboxes_idx[i]].detected -= 1
+                self.trackers[keep_tboxes_idx[i]].hit -= 1
                 self.trackers[keep_tboxes_idx[i]].chit = 0
+                self.trackers[keep_tboxes_idx[i]].cmiss += 1
+                print('Missed tracker: detected num', self.trackers[keep_tboxes_idx[i]].detected)
 
-                
+        #if self.history >= 800 and np.prod(overlaps.shape) == 0:
+        #    import pdb
+        #    pdb.set_trace() 
         print(dboxes, tboxes, matched_indices, merged_boxes, d_or_t)
         self.output_boxlist = BoxList({
           'boxes': merged_boxes,
@@ -298,7 +317,13 @@ class LightPool(object):
                 valid.append(i) 
         print(valid)
         return valid
+
+    def get_states(self):
+        return [ self.trackers[id_].get_state() for id_ in self.output_boxlist.get_field('index')]
            
+    def get_types(self):
+        return [ self.trackers[id_].get_type() for id_ in self.output_boxlist.get_field('index')]
+
     def set_pedestrain_light(self):
         """
         Return pedestrain light: if not sure, return None, else return the tracker. 

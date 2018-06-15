@@ -130,7 +130,6 @@ def test_light_classifier(video_path, save_path):
         visor.drawer(data)
 
 def batch_test_zebra_contours(video_path_list):
-  navigator = BlindNavigator()
   visualizer = Visualizer()
     
   cmap = {
@@ -144,6 +143,7 @@ def batch_test_zebra_contours(video_path_list):
   for video_path in video_path_list:
       if not video_path.endswith('.mp4'):
         continue
+      navigator = BlindNavigator()
   
       visor = Visor(debuger)
       visor.initializer()

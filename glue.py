@@ -63,7 +63,11 @@ class BlindNavigator(object):
             box = box.astype(int)
             
             cropped_image = image[box[1]:box[3], box[0]:box[2], :]
-            print('cropped box: ', box)
+            #print('cropped box: ', box)
+            if cropped_image is None or cropped_image.shape[0] == 0:
+                print('cropped nothing...................')
+                print('crop box: ', box)
+                continue
             labels.append(self.color_classify_by_patch(cropped_image, order))
         return labels
     
@@ -144,6 +148,8 @@ class BlindNavigator(object):
     
     def _has_obstacle(self, obstacles, thresh=1):
         dist = obstacles.get_field('distances')
+        if len(dist) == 0:
+            return False
         closet_obs_depth = min(dist)
         print('dist: ', dist)
         if closet_obs_depth > thresh:
@@ -163,14 +169,17 @@ class BlindNavigator(object):
         light_states = self.color_classify_by_boxes(image, traffic_lights.get(), '210')
         mask, rb_image = self.get_mask(image)
         light_types = self.estimate_pedestrain_light(image, traffic_lights.get(), mask)
-        traffic_lights.add_field('states', light_states)
-        traffic_lights.add_field('types', light_types)
 
         self.traffic_light_pool.set_types(light_types)
         valid = self.traffic_light_pool.set_states(light_states)
+
+        traffic_lights.add_field('states', self.traffic_light_pool.get_states())
+        traffic_lights.add_field('types', self.traffic_light_pool.get_types())
+
         self.traffic_light_pool.set_pedestrain_light()
         plight = self.traffic_light_pool.get_pedestrain_light()
         if plight:
+            print('Has pedestrain light, state', plight.get_state())
             # find a valid green light
             if self.state == 'LIGHT_WAIT':
                 if plight.get_state() == 'G':
