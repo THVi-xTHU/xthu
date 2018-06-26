@@ -6,7 +6,7 @@ from non_maximum_suppression import non_max_suppression_slow
 from util.box_list import BoxList
 from util.box_list_ops import *
 from hyperparams import *
-
+DEBUG=True
 class LightTracker(object):
     def __init__(self, image, bbox, use_hog=False):
         """ type: 0: not pedestrain light, 1: pedestrain light, 2: not determined
@@ -110,14 +110,16 @@ class LightTracker(object):
     def add_state(self, state):
         self._age += 1
         self.state_hist.append(state)
-        print(self.state_hist)
+        if DEBUG:
+            print(self.state_hist)
         if state != 'B':
             self.ever_colored += 1
         #if len(self.state_hist) >= STATE_LEN:
         #    if self.state_hist[0] != 'B':
         #        self.ever_colored -= 1
         self.state_hist = self.state_hist[- STATE_LEN:]
-        print(self.state_hist)
+        if DEBUG:
+            print(self.state_hist)
 
 
         green = sum([ 1 for state in self.state_hist if state == 'G'])
@@ -129,7 +131,8 @@ class LightTracker(object):
             self.state = 'R'
         else:
             self.state = 'B'
-        print('G: ', green, ', R: ', red, ', B: ', black, ', State_HIST: ', self.state_hist, self.state, 'ever_colored', self.ever_colored, 'box', self.bbox)
+        if DEBUG:
+            print('G: ', green, ', R: ', red, ', B: ', black, ', State_HIST: ', self.state_hist, self.state, 'ever_colored', self.ever_colored, 'box', self.bbox)
         
 
     def check_false_alarm(self):
@@ -180,13 +183,14 @@ class LightPool(object):
     
     def remove_tracker(self):
         keep_indices = [i for i, tracker in enumerate(self.trackers) if tracker.hit >= MIN_HIT_THRESHOLD and tracker.detected >= MIN_DET_COUNT and tracker.cmiss >= MAX_MISS_THRESHOLD]
-        for i, tracker in enumerate(self.trackers):
-            if i not in keep_indices:
-                print('Removed tracker: ', tracker.get_bbox(), ', hit: %d, detected: %d'%(tracker.hit, tracker.detected))
-        if self.forward_max_times > TYPE_WAIT_LEN * TYPE_THRESHOLD and 0 not in keep_indices and len(self.trackers) > 0:        
-            print('Remove current tracker, the tracker has hit %d, detected %d'%(
-                self.trackers[0].hit, self.trackers[0].detected))
-            print('Tracker Info: forward pc %d, cur pc %d, tracker pc %d:'%(self.forward_max_times, self.cur_max_times, self.trackers[0].pc[1]), self.trackers[0].get_bbox())
+        if DEBUG:
+            for i, tracker in enumerate(self.trackers):
+                if i not in keep_indices:
+                    print('Removed tracker: ', tracker.get_bbox(), ', hit: %d, detected: %d'%(tracker.hit, tracker.detected))
+            if self.forward_max_times > TYPE_WAIT_LEN * TYPE_THRESHOLD and 0 not in keep_indices and len(self.trackers) > 0:        
+                print('Remove current tracker, the tracker has hit %d, detected %d'%(
+                    self.trackers[0].hit, self.trackers[0].detected))
+                print('Tracker Info: forward pc %d, cur pc %d, tracker pc %d:'%(self.forward_max_times, self.cur_max_times, self.trackers[0].pc[1]), self.trackers[0].get_bbox())
         self.trackers = [self.trackers[i] for i in keep_indices]
         if 0 not in keep_indices:
             # TODO, refind the forward max time
@@ -229,7 +233,8 @@ class LightPool(object):
 
         overlaps = iou(tbox_list, dbox_list)
         dboxes = dbox_list.get()
-        print(dboxes, '\n', tbox_list.get(), overlaps)
+        if DEBUG:
+            print(dboxes, '\n', tbox_list.get(), overlaps)
 
         if np.prod(overlaps.shape) != 0:
             tscores = overlaps.max(axis=1)
@@ -265,8 +270,9 @@ class LightPool(object):
                 keep_indices.append(i)
         
         matched_indices = matched_indices[keep_indices]
-        print(overlaps)
-        print(matched_indices)
+        if DEBUG:
+            print(overlaps)
+            print(matched_indices)
         
         # new detected traffic lights
         for i in range(dbox_list.num_boxes()):
@@ -289,12 +295,14 @@ class LightPool(object):
                 self.trackers[keep_tboxes_idx[i]].hit -= 1
                 self.trackers[keep_tboxes_idx[i]].chit = 0
                 self.trackers[keep_tboxes_idx[i]].cmiss += 1
-                print('Missed tracker: detected num', self.trackers[keep_tboxes_idx[i]].detected)
+                if DBEUG:
+                    print('Missed tracker: detected num', self.trackers[keep_tboxes_idx[i]].detected)
 
         #if self.history >= 800 and np.prod(overlaps.shape) == 0:
         #    import pdb
         #    pdb.set_trace() 
-        print(dboxes, tboxes, matched_indices, merged_boxes, d_or_t)
+        if DEBUG:
+            print(dboxes, tboxes, matched_indices, merged_boxes, d_or_t)
         self.output_boxlist = BoxList({
           'boxes': merged_boxes,
           'index': merged_idx,
@@ -310,12 +318,12 @@ class LightPool(object):
             
     def set_states(self, states):
         valid = []
-        print(self.output_boxlist.get_field('index'))
+        if DEBUG:
+            print(self.output_boxlist.get_field('index'))
         for i, (id_, state) in enumerate(zip(self.output_boxlist.get_field('index'),  states)):
             self.trackers[id_].add_state(state)
             if not self.trackers[id_].check_false_alarm():
                 valid.append(i) 
-        print(valid)
         return valid
 
     def get_states(self):
@@ -329,7 +337,8 @@ class LightPool(object):
         Return pedestrain light: if not sure, return None, else return the tracker. 
         It shuffles the tracker order to put the pedestrain light in the queue front.
         """
-        print('Cur Max Pedestrain Light vote %d, Forward Max Pedestrain Light vote %d'%(self.cur_max_times, self.forward_max_times))
+        if DEBUG:
+            print('Cur Max Pedestrain Light vote %d, Forward Max Pedestrain Light vote %d'%(self.cur_max_times, self.forward_max_times))
         arg_max = []
         if len(self.trackers) == 0:
             self.pedestrain_light = None
@@ -352,11 +361,11 @@ class LightPool(object):
                         arg_max.append(i)
             if not arg_max:
                 return
-            
-            if len(arg_max) > 1:
-                print('[LOG] find %d feasible light, cannot decide which pedestrain light is better, wait...'%len(arg_max))
-                return
-            print('Tracker %d has been determined as pedestrain light %d times '%(arg_max[0], self.forward_max_times))
+            if DBEUG: 
+                if len(arg_max) > 1:
+                    print('[LOG] find %d feasible light, cannot decide which pedestrain light is better, wait...'%len(arg_max))
+                    return
+                print('Tracker %d has been determined as pedestrain light %d times '%(arg_max[0], self.forward_max_times))
             # insert the selected tracker to front of queue
             tmp = self.trackers[arg_max[0]]
             del self.trackers[arg_max[0]]

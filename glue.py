@@ -13,6 +13,7 @@ from fcrn_depth_prediction.depth import Depth
 from KittiSeg.kittiseg import KittiSeg
 from Zebra import Zebra
 from hyperparams import *
+from obstacles import Obstacles 
 
 class BlindNavigator(object):
     def __init__(self):
@@ -21,6 +22,7 @@ class BlindNavigator(object):
         #self.segmentator = KittiSeg(default_run=path['KITTI_MODEL'], runs_dir=path['KITTI_RUNS'], hype_path=path['KITTI_HYPES'], data_dir=path['KITTI_DATA_DIR'])        
         self.zebra_detector = Zebra()
         self.traffic_light_pool = LightPool()
+        self.obstacle_pool = Obstacles()
         self.state = 'LIGHT_WAIT'
         self.alert = None
         self.zebra_contours = []
@@ -140,6 +142,7 @@ class BlindNavigator(object):
             od.append(np.median(cropped_depth.ravel()))
             # od.append('10')
         obstacles.add_field('distances', od)
+        return depth
             
     def arrive(self, image):
         if len(self.traffic_light_pool.trackers) == 0:
@@ -164,7 +167,8 @@ class BlindNavigator(object):
         
     def executor(self, image):
         traffic_lights, detected_obstacles = self.detect_traffic_light(image)
-        self.compute_distance_of_obstacles(image, detected_obstacles)
+        depth = self.compute_distance_of_obstacles(image, detected_obstacles)
+        obstacle_instances = self.obstacle_pool.associate(detected_obstacles, depth)
         
         light_states = self.color_classify_by_boxes(image, traffic_lights.get(), '210')
         mask, rb_image = self.get_mask(image)
@@ -216,7 +220,7 @@ class BlindNavigator(object):
                 print('[%s] Arrive'%self.state)
         print('Original:', traffic_lights.num_boxes(), 'Left: ', valid)
         traffic_lights.keep_indices(valid) 
-        return plight, detected_obstacles, traffic_lights, rb_image
+        return plight, obstacle_instances, traffic_lights, rb_image
     
 
 

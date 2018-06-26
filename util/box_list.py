@@ -31,7 +31,7 @@ class BoxList(object):
   objectness/classification scores).
   """
 
-  def __init__(self, data):
+  def __init__(self, data=None):
     """Constructs box collection.
 
     Args:
@@ -42,7 +42,9 @@ class BoxList(object):
       ValueError: if invalid dimensions for bbox data
     """
     self.shape = None
-
+    if data is None:
+      self.data = {'boxes': np.empty((0,4))}
+      return 
     if isinstance(data, dict):
       self.data = {
         k: np.asarray(v) for k, v in data.items()
@@ -89,6 +91,14 @@ class BoxList(object):
       raise ValueError('Invalid dimensions for field data')
     self.data[field] = field_data
 
+  def add_field_data(self, field, data):
+
+    field_data = np.asarray(data).reshape(1,-1)
+    if not self.has_field(field):
+      self.data[field] = field_data 
+    else:
+      self.data[field] = np.concatenate((self.data[field], field_data))
+
   def get(self):
     """Convenience function for accesssing box coordinates.
 
@@ -110,7 +120,8 @@ class BoxList(object):
       ValueError: if invalid field
     """
     if not self.has_field(field):
-      raise ValueError('field {} does not exist'.format(field))
+      return np.array([])
+      #raise ValueError('field {} does not exist'.format(field))
     return self.data[field]
 
   def get_coordinates(self):

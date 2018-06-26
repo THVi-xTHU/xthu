@@ -52,7 +52,7 @@ class Visor(object):
             (h, w) = im.shape[:2]
 
         if self.form == 'OFFLINE' and self.handler is None:
-            self.handler = cv2.VideoWriter(save_path, self.fourcc, 30, (w, h), True)
+            self.handler = cv2.VideoWriter(save_path, self.fourcc, 5, (w, h), True)
         elif self.form != 'OFFLINE':
             im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
         return im
@@ -141,7 +141,7 @@ def batch_test_zebra_contours(video_path_list):
         
     }
   for video_path in video_path_list:
-      if not video_path.endswith('.mp4'):
+      if not video_path.endswith('.avi'):
         continue
       navigator = BlindNavigator()
   
@@ -177,14 +177,14 @@ def batch_test_zebra_contours(video_path_list):
         #import pdb
         #pdb.set_trace()
 
-
         depth = navigator.depth_estimator.predict(data)
-
-        obs_cls = detected_obstacles.get_field('classes')
+        obs_cls = detected_obstacles.get_field('classes').reshape(-1,)
+        obs_ids = detected_obstacles.get_field('ids').reshape(-1,)
+        obs_directions = detected_obstacles.get_field('directions')
         obs_boxes = detected_obstacles.get()
 
 
-        data = visualizer.plot(data, obs_cls, obs_boxes, depth, navigator.is_stable, navigator.zebra_contours)
+        data = visualizer.plot(data, obs_cls, obs_ids, obs_directions, obs_boxes, depth, navigator.is_stable, navigator.zebra_contours)
 
         data = cv2.cvtColor(data, cv2.COLOR_BGRA2BGR)
         text = cmap[navigator.state]
@@ -264,15 +264,11 @@ def test_zebra_contours(video_path, save_path):
     ax.imshow(road_mask.astype(np.uint8)) 
 #         plt.show()
     plt.savefig('test.png')
-    import pdb
-    pdb.set_trace()
     depth = navigator.depth_estimator.predict(data)
     
-    obs_cls = detected_obstacles.get_field('classes')
-    obs_boxes = detected_obstacles.get()
     
 
-    data = visualizer.plot(data, obs_cls, obs_boxes, depth, navigator.is_stable, navigator.zebra_contours)
+    data = visualizer.plot(data, detected_obstacles, depth, navigator.is_stable, navigator.zebra_contours)
     
     data = cv2.cvtColor(data, cv2.COLOR_BGRA2BGR)
     text = cmap[navigator.state]

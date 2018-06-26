@@ -80,6 +80,43 @@ class Visualizer(object):
     im = np.array(img)
     return im
 
+  def add_instance_boxes(self, im, clses, ids, directions, boxes, dd):
+    img = Image.fromarray(im)
+    for cls, _id, box, direct, d in zip(clses, ids, boxes, directions, dd):
+      color = self.colors[self.all_classes.index(cls)]
+
+      draw = ImageDraw.Draw(img)  # 括号中为需要打印的canvas，这里就是在图片上直接打印
+      label_size = draw.textsize(cls + ' %d '%_id +  ' d: %.1f' % d, efont)
+
+      if box[1] - label_size[1] >= 0:
+        text_origin = np.array([box[0], box[1] - label_size[1]])
+      else:
+        text_origin = np.array([box[0], box[1] + 1])
+
+      for i in range(thickness):
+        draw.rectangle(
+          [box[0] + i, box[1] + i, box[2] - i, box[3] - i],
+          outline=color)
+      draw.rectangle(
+        [tuple(text_origin), tuple(text_origin + label_size)],
+        fill=(0x00, 0x99, 0xFF))
+      draw.text(text_origin, cls + ' %d '%_id + ' d: %.1f' % d, fill=(255, 255, 255), font=efont)
+      
+      if direct[0] > direct[1]:
+        offset_x = min(direct[0], 10)
+        offset_y = direct[1] / (direct[0] + 1e-4) * offset_x
+      else:
+        offset_y = min(direct[1], 10)
+        offset_x = direct[0] / (direct[1] + 1e-4) * offset_y
+      offset_x = np.round(offset_x).astype(int)
+      offset_y = np.round(offset_y).astype(int)
+      start = ((box[0] + box[2]) / 2, box[3])
+      draw.line(start + (start[0] + offset_x, start[1] + offset_y), fill=128)
+    im = np.array(img)
+    return im
+
+
+
   def add_traffic(self, im, lights, boxes):
     font = cv2.FONT_HERSHEY_SIMPLEX
 
@@ -92,8 +129,7 @@ class Visualizer(object):
       cv2.putText(im, '%s' % cls, (box[0] - 1, box[1] - 1), font, 1, color, thickness=1)
     return im
 
-  def plot(self, im, clses, boxes, depth, is_stable, contours):
-    
+  def plot(self, im, clses, ids, directions, boxes, depth, is_stable, contours):
     depth = cv2.resize(depth, (im.shape[1], im.shape[0]), interpolation=cv2.INTER_CUBIC)
     depth = depth - np.min(depth)
 
@@ -102,7 +138,8 @@ class Visualizer(object):
 
     if is_stable:
       im = self.add_zebra(im, contours)
-    im = self.add_boxes(im, clses, boxes, d)
+    #im = self.add_boxes(im, clses, boxes, d)
+    im = self.add_instance_boxes(im, clses, ids, directions, boxes, d)
     
 
     # if traffic_lights:

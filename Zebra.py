@@ -116,7 +116,7 @@ class Zebra(object):
         # cv2.imshow("img", im)
         # cv2.waitKey(0)
         
-        
+	        
         for i in contours:
             bx, by, bw, bh = cv2.boundingRect(i)
             if road_mask and sum(road_mask[bx:bx+bw, by:by+bh]) / (bw * bh) < 0.5:
