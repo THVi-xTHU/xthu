@@ -177,6 +177,7 @@ class BoxList(object):
     if data.shape[0] > 0:
       for i in range(data.shape[0]):
         if data[i, 0] > data[i, 2] or data[i, 1] > data[i, 3]:
+          print(data[i, :])
           return False
     return True
 

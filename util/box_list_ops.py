@@ -233,7 +233,7 @@ def non_max_suppression(boxlist,
 
 
 def multi_class_non_max_suppression(boxlist, score_thresh, iou_thresh,
-                                    max_output_size):
+                                    max_output_size=10000):
   """Multi-class version of non maximum suppression.
 
   This op greedily selects a subset of detection bounding boxes, pruning

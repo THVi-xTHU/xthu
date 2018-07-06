@@ -290,6 +290,7 @@ class KCFTracker:
         self.train(self._tmpl, 1.0)
 
     def predict(self, image):
+        print(self._roi)
         if(self._roi[0]+self._roi[2] <= 0):  self._roi[0] = -self._roi[2] + 1
         if(self._roi[1]+self._roi[3] <= 0):  self._roi[1] = -self._roi[2] + 1
         if(self._roi[0] >= image.shape[1]-1):  self._roi[0] = image.shape[1] - 2
@@ -321,12 +322,13 @@ class KCFTracker:
         
         self._roi[0] = cx - self._roi[2]/2.0 + loc[0]*self.cell_size*self._scale
         self._roi[1] = cy - self._roi[3]/2.0 + loc[1]*self.cell_size*self._scale
-        
+        print(self._roi) 
         if(self._roi[0] >= image.shape[1]-1):  self._roi[0] = image.shape[1] - 1
         if(self._roi[1] >= image.shape[0]-1):  self._roi[1] = image.shape[0] - 1
         if(self._roi[0]+self._roi[2] <= 0):  self._roi[0] = -self._roi[2] + 2
         if(self._roi[1]+self._roi[3] <= 0):  self._roi[1] = -self._roi[3] + 2
         assert(self._roi[2]>0 and self._roi[3]>0)
+        print(self._roi)
         return self._roi, peak_value
           
     def update(self, image):
