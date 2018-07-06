@@ -12,6 +12,9 @@ import sys
 from visualization import Visualizer
 from hyperparams import *
 
+from functools import reduce
+from _eval.evaluate import evaluate
+
 
 class Visor(object):
     def __init__(self, form = 'OFFLINE'):
@@ -128,6 +131,46 @@ def test_light_classifier(video_path, save_path):
             font = cv2.FONT_HERSHEY_SIMPLEX
             cv2.putText(data, '%s'%(state), (bbox[0]-1,bbox[1]-1), font, 1, color=(255,255,0), thickness=2)
         visor.drawer(data)
+
+def keep_box_list(box_list, field, val_list):
+  values = box_list.get_field(field)
+  init = np.zeros(values.shape)
+  keep_ind = reduce(np.logical_or, [values == va for val in val_list])
+  box_list.keep_indices(keep_ind)
+
+def batch_test_yolo(video_path_list, read_func):
+  for video_path in video_path_list:
+      #if not video_path.endswith('.avi'):
+      #  continue
+      if '00' not in video_path:
+        continue
+      
+      navigator = BlindNavigator()
+  
+      #visor = Visor(debuger)
+      #visor.initializer()
+      save_path = video_path.split('.')[0] + '_processed.avi'
+      csv_save_path =  video_path.split('.')[0] + '.json' 
+      if os.path.exists(save_path):
+          continue
+      print('Input: %s, Output:%s'%(video_path, save_path))
+      detection = []
+      for iiii, data in enumerate(read_func(video_path)):
+        if data is None:
+            break
+        detection_box_list = navigator.detector.predict(data)
+        keep_box_list(detection_box_list, 'classes', ['car', 'trafficLight', 'pedestrain'])
+        detection.append({
+          'img_name': '%05d'%iiii,
+          'attributes': to_result(detection_box_list)
+        })
+      #with open(csv_save_path, 'w') as fw:
+      #  json.dump(image_attributes, fw)
+      groundtruth = to_json(video_path.split('.')[0] + '.csv')
+      print('evaluating image %s', video_path)
+      for i in range(3):
+        evaluate(groundtruth, detection, current_class=i) 
+ 
 
 def batch_test_zebra_contours(video_path_list):
   visualizer = Visualizer()
@@ -310,6 +353,13 @@ def test_zebra_contours(video_path, save_path):
 
     visor.drawer(data)
 
+def read_images(image_folder):
+  images = os.listdir(image_folder)
+  for img in images:
+    if not img.endswith('jpg'):
+      continue
+    yield cv2.imread(os.path.join(image_folder, img))
+
 def parse_args():
     parser = argparse.ArgumentParser(description='the Visually Impaired Assistant')
     parser.add_argument('--video_path', help='Video path of input', type=str)
@@ -328,7 +378,10 @@ if __name__ == '__main__':
 #     test_zebra_contours(args.video_path, args.save_path)
     import os
     os.environ["CUDA_VISIBLE_DEVICES"] = args.ngpu
-    videos = []
-    for c, dirs, files in os.walk(args.video_path):
-        videos.extend([os.path.join(c,file) for file in files])
-    batch_test_zebra_contours(videos)
+    #videos = []
+    #for c, dirs, files in os.walk(args.video_path):
+    #    videos.extend([os.path.join(c,file) for file in files])
+    videos = [agrs.video_path + '/' + f.split('.')[0] \
+        for f in os.listdir(args.video_path) if f.endswith('csv')] 
+    batch_test_yolo(videos, read_images)
+    #batch_test_zebra_contours(videos)

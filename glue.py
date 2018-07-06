@@ -13,7 +13,7 @@ from fcrn_depth_prediction.depth import Depth
 from KittiSeg.kittiseg import KittiSeg
 from Zebra import Zebra
 from hyperparams import *
-from obstacles import Obstacles 
+#from obstacles import Obstacles 
 
 class BlindNavigator(object):
     def __init__(self):
@@ -164,7 +164,8 @@ class BlindNavigator(object):
         mask, rb_image = None, None
        
         return mask, rb_image
-        
+
+
     def executor(self, image):
         traffic_lights, detected_obstacles = self.detect_traffic_light(image)
         depth = self.compute_distance_of_obstacles(image, detected_obstacles)
