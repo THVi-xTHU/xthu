@@ -228,8 +228,8 @@ class LightPool(object):
         dscores = dbox_list.get_field('scores')
         
         keep_dboxes_idx = non_max_suppression_slow(dboxes, dscores, NMS_THRESHOLD)
-
-        dbox_list.keep_indices(sorted(keep_dboxes_idx))
+        keep_dboxes_idx = sorted(keep_dboxes_idx)
+        dbox_list.keep_indices(keep_dboxes_idx)
 
         overlaps = iou(tbox_list, dbox_list)
         dboxes = dbox_list.get()

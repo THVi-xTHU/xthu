@@ -168,7 +168,7 @@ class BlindNavigator(object):
     def executor(self, image):
         traffic_lights, detected_obstacles = self.detect_traffic_light(image)
         depth = self.compute_distance_of_obstacles(image, detected_obstacles)
-        obstacle_instances = self.obstacle_pool.associate(detected_obstacles, depth)
+        obstacle_instances = self.obstacle_pool.associate(detected_obstacles, depth, image)
         
         light_states = self.color_classify_by_boxes(image, traffic_lights.get(), '210')
         mask, rb_image = self.get_mask(image)

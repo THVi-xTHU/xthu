@@ -181,10 +181,11 @@ def batch_test_zebra_contours(video_path_list):
         obs_cls = detected_obstacles.get_field('classes').reshape(-1,)
         obs_ids = detected_obstacles.get_field('ids').reshape(-1,)
         obs_directions = detected_obstacles.get_field('directions')
+        obs_states = detected_obstacles.get_field('states').reshape(-1,)
         obs_boxes = detected_obstacles.get()
+        print(obs_ids)
 
-
-        data = visualizer.plot(data, obs_cls, obs_ids, obs_directions, obs_boxes, depth, navigator.is_stable, navigator.zebra_contours)
+        data = visualizer.plot(data, obs_cls, obs_ids, obs_directions, obs_states, obs_boxes, depth, navigator.is_stable, navigator.zebra_contours)
 
         data = cv2.cvtColor(data, cv2.COLOR_BGRA2BGR)
         text = cmap[navigator.state]

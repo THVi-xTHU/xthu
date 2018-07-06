@@ -80,13 +80,14 @@ class Visualizer(object):
     im = np.array(img)
     return im
 
-  def add_instance_boxes(self, im, clses, ids, directions, boxes, dd):
+  def add_instance_boxes(self, im, clses, ids, directions, states, boxes, dd):
     img = Image.fromarray(im)
-    for cls, _id, box, direct, d in zip(clses, ids, boxes, directions, dd):
+    for cls, _id, box, direct, state, d in zip(clses, ids, boxes, directions, states, dd):
       color = self.colors[self.all_classes.index(cls)]
 
       draw = ImageDraw.Draw(img)  # 括号中为需要打印的canvas，这里就是在图片上直接打印
-      label_size = draw.textsize(cls + ' %d '%_id +  ' d: %.1f' % d, efont)
+      #label_size = draw.textsize(cls + ' %d '%_id +  ' d: %.1f' % d, efont)
+      label_size = draw.textsize(cls[0] + '%d'%_id + state , efont)
 
       if box[1] - label_size[1] >= 0:
         text_origin = np.array([box[0], box[1] - label_size[1]])
@@ -100,7 +101,8 @@ class Visualizer(object):
       draw.rectangle(
         [tuple(text_origin), tuple(text_origin + label_size)],
         fill=(0x00, 0x99, 0xFF))
-      draw.text(text_origin, cls + ' %d '%_id + ' d: %.1f' % d, fill=(255, 255, 255), font=efont)
+      #draw.text(text_origin, cls + ' %d '%_id + ' d: %.1f' % d, fill=(255, 255, 255), font=efont)
+      draw.text(text_origin, cls[0] + '%d'%_id + state, fill=(255, 255, 255), font=efont)
       
       if direct[0] > direct[1]:
         offset_x = min(direct[0], 10)
@@ -129,7 +131,7 @@ class Visualizer(object):
       cv2.putText(im, '%s' % cls, (box[0] - 1, box[1] - 1), font, 1, color, thickness=1)
     return im
 
-  def plot(self, im, clses, ids, directions, boxes, depth, is_stable, contours):
+  def plot(self, im, clses, ids, directions, states, boxes, depth, is_stable, contours):
     depth = cv2.resize(depth, (im.shape[1], im.shape[0]), interpolation=cv2.INTER_CUBIC)
     depth = depth - np.min(depth)
 
@@ -139,7 +141,7 @@ class Visualizer(object):
     if is_stable:
       im = self.add_zebra(im, contours)
     #im = self.add_boxes(im, clses, boxes, d)
-    im = self.add_instance_boxes(im, clses, ids, directions, boxes, d)
+    im = self.add_instance_boxes(im, clses, ids, directions, states, boxes, d)
     
 
     # if traffic_lights:
