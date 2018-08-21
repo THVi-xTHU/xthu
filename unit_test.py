@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-  
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from glue import BlindNavigator
@@ -330,8 +331,9 @@ if __name__ == '__main__':
 
 #     test_zebra_contours(args.video_path, args.save_path)
     import os
+    import json
     os.environ["CUDA_VISIBLE_DEVICES"] = args.ngpu
     videos = []
-    for c, dirs, files in os.walk(args.video_path):
+    files in os.walk(args.video_path):
         videos.extend([os.path.join(c,file) for file in files])
     batch_test_zebra_contours(videos)

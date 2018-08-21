@@ -1,13 +1,13 @@
 import numpy as np 
 import cv2
-from numba import jit
+#from numba import jit
 
 # constant
 NUM_SECTOR = 9
 FLT_EPSILON = 1e-07
 
 
-@jit(cache=True)
+#@jit(cache=True)
 def func1(dx, dy, boundary_x, boundary_y, height, width, numChannels):
     r = np.zeros((height, width), np.float32)
     alfa = np.zeros((height, width, 2), np.int)
@@ -45,7 +45,7 @@ def func1(dx, dy, boundary_x, boundary_y, height, width, numChannels):
             alfa[j, i, 1] = maxi
     return r, alfa
 
-@jit(cache=True)
+#@jit(cache=True)
 def func2(dx, dy, boundary_x, boundary_y, r, alfa, nearest, w, k, height, width, sizeX, sizeY, p, stringSize):
     mapp = np.zeros((sizeX*sizeY*p), np.float32)
     for i in range(sizeY):
@@ -66,7 +66,7 @@ def func2(dx, dy, boundary_x, boundary_y, r, alfa, nearest, w, k, height, width,
                             mapp[(i+nearest[ii])*stringSize + (j+nearest[jj])*p + alfa[k*i+ii,j*k+jj,1] + NUM_SECTOR] += r[k*i+ii,j*k+jj] * w[ii,1] * w[jj,1]
     return mapp
 
-@jit(cache=True)
+#@jit(cache=True)
 def func3(partOfNorm, mappmap, sizeX, sizeY, p, xp, pp):
     newData = np.zeros((sizeY*sizeX*pp), np.float32)
     for i in range(1, sizeY+1):
@@ -103,7 +103,7 @@ def func3(partOfNorm, mappmap, sizeX, sizeY, p, xp, pp):
             newData[pos2+10*p:pos2+12*p] = mappmap[pos1+p:pos1+3*p] / valOfNorm
     return newData
 
-@jit(cache=True)
+#@jit(cache=True)
 def func4(mappmap, p, sizeX, sizeY, pp, yp, xp, nx, ny):
     newData = np.zeros((sizeX*sizeY*pp), np.float32)
     for i in range(sizeY):
