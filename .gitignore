@@ -13,3 +13,4 @@ data
 */__pycache__/*
 .*.swp
 */.*.swp
+*.log
